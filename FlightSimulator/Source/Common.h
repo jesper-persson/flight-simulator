@@ -8,5 +8,3 @@ public:
 	GLuint vao;
 	int numIndices;
 };
-
-Model objLoader(std::string path);

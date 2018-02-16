@@ -21,11 +21,11 @@ void main() {
 	vec3 lightDir = normalize(vec3(1.8, -2, 1));
 	vec3 fragToLight = -lightDir;
 	float diffuse = dot(fragToLight, normalize(normal_out)) * 1.5;
-	if (diffuse < 0.3) {
-		diffuse = 0.3;
+	if (diffuse < 0.2) {
+		diffuse = 0.2;
 	}
 
-	gl_Color = texture(tex, texture_out * 3050) * diffuse;
+	gl_Color = texture(tex, texture_out) * diffuse;
 	gl_Color.w = 1;
 	//gl_Color = vec4(texture_out.xy,0,1);
 }

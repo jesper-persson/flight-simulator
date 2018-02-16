@@ -5,6 +5,9 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -43,6 +46,7 @@ public:
 	// Distance vector from center of object to point with lowest y value
 	glm::vec3 groundContactPoint;
 	glm::vec3 impulse;
+	GLuint textureId;
 	GLuint vao;
 	int numIndices;
 };
@@ -80,6 +84,8 @@ void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
 	glBindVertexArray(entity.vao);
 
+	glBindTexture(GL_TEXTURE_2D, entity.textureId);
+
 	glDrawElements(GL_TRIANGLES, entity.numIndices, GL_UNSIGNED_INT, (void*)0);
 }
 
@@ -92,6 +98,33 @@ void runPhysics(Entity &ground, Entity &entity, float dt) {
 		entity.position.y = ground.position.y - entity.groundContactPoint.y;
 		entity.velocity.y = 0;
 	}
+}
+
+GLuint loadPNGTexture(std::string filename) {
+	const char* filenameC = (const char*)filename.c_str();
+	std::vector<unsigned char> image;
+	unsigned width, height;
+	unsigned error = lodepng::decode(image, width, height, filename);
+
+	std::vector<unsigned char> imageCopy;
+	for (int t = height - 1; t >= 0; t--) {
+		for (int s = 0; s < width; s++) {
+			imageCopy.push_back(image[t * 4 * width + 4 * s]);
+			imageCopy.push_back(image[t * 4 * width + 4 * s + 1]);
+			imageCopy.push_back(image[t * 4 * width + 4 * s + 2]);
+			imageCopy.push_back(image[t * 4 * width + 4 * s + 3]);
+		}
+	}
+
+	GLuint texId;
+	glGenTextures(1, &texId);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, texId);
+	glActiveTexture(GL_TEXTURE0);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
+	return texId;
 }
 
 GLuint getVAOGround() {
@@ -159,27 +192,6 @@ GLuint getVAOGround() {
 	glGenBuffers(1, &indexBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indexData, GL_STATIC_DRAW);
-
-	std::string filename = "Resources\\grass512.png";
-	const char* filenameC = (const char*)filename.c_str();
-	std::vector<unsigned char> image;
-	unsigned width, height;
-	unsigned error = lodepng::decode(image, width, height, filename);
-
-	std::vector<unsigned char> imageCopy;
-	for (int t = 511; t >= 0; t--) {
-		for (int s = 0; s < 512; s++) {
-			imageCopy.push_back(image[t * 4 * 512 + 4 * s ]);
-			imageCopy.push_back(image[t * 4 * 512 + 4 * s + 1]);
-			imageCopy.push_back(image[t * 4 * 512 + 4 * s + 2]);
-			imageCopy.push_back(image[t * 4 * 512 + 4 * s + 3]);
-		}
-	}
-
-	glEnable(GL_TEXTURE_2D);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, 4, 512, 512, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
 
 	return vao;
 }
@@ -534,6 +546,102 @@ static void error_callback(int error, const char* description) {
 	fprintf(stderr, "Error: %s\n", description);
 }
 
+Model tinyObjLoader(std::string fileName) {
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+
+	std::string err;
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, fileName.c_str());
+
+	if (!err.empty()) {
+		std::cerr << err << std::endl;
+	}
+
+	std::vector<GLfloat> vertices;
+	std::vector<GLfloat> normals;
+	std::vector<GLfloat> textures;
+	std::vector<GLuint> indices;
+
+	// Loop over shapes
+	int i = 0;
+	for (size_t s = 0; s < shapes.size(); s++) {
+		
+		// Loop over faces (polygon)
+		size_t index_offset = 0;
+		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+			int fv = shapes[s].mesh.num_face_vertices[f];
+			
+			// Loop over vertices in the face.
+			for (size_t v = 0; v < fv; v++) {
+				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+				tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
+				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
+				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
+				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+				tinyobj::real_t tx = attrib.texcoords[2 * idx.texcoord_index + 0];
+				tinyobj::real_t ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+
+				vertices.push_back(vx);
+				vertices.push_back(vy);
+				vertices.push_back(vz);
+				normals.push_back(nx);
+				normals.push_back(ny);
+				normals.push_back(nz);
+				textures.push_back(tx);
+				textures.push_back(ty);
+				indices.push_back(i);
+				i++;
+			}
+			index_offset += fv;
+
+			// per-face material
+			shapes[s].mesh.material_ids[f];
+		}
+	}
+
+	GLfloat *vertexData = &vertices[0];
+	GLfloat *normalData = &normals[0];
+	GLfloat *textureData = &textures[0];
+	GLuint *indexData = &indices[0];
+
+	GLuint vao = 0;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	GLuint vertexBuffer = 0;
+	glGenBuffers(1, &vertexBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertexData, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	GLuint normalBuffer = 0;
+	glGenBuffers(1, &normalBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
+	glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(GLfloat), normalData, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+
+	GLuint textureBuffer = 0;
+	glGenBuffers(1, &textureBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, textureBuffer);
+	glBufferData(GL_ARRAY_BUFFER, textures.size() * sizeof(GLfloat), textureData, GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(2);
+
+	GLuint indexBuffer = 0;
+	glGenBuffers(1, &indexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * indices.size(), indexData, GL_STATIC_DRAW);
+
+	Model m;
+	m.numIndices = vertices.size();
+	m.vao = vao;
+	return m;
+}
 
 int main() {
 	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, 800.0f/600.0f, .1f, 450);
@@ -564,6 +672,7 @@ int main() {
 	ground.numIndices = 6;
 	ground.position = glm::vec3(0, -1.0f, 0);
 	ground.scale = glm::vec3(4580, 1, 4580);
+	ground.textureId = loadPNGTexture("Resources/grass512.png");
 
 	Entity box = Entity();
 	box.vao = getVAOBox();
@@ -571,6 +680,17 @@ int main() {
 	box.position = glm::vec3(10, 2, -3);
 	box.scale = glm::vec3(1, 1, 1);
 	box.groundContactPoint = glm::vec3(0, -1, 0);
+
+	Model m = tinyObjLoader("Resources/jas.obj");
+	Entity plane = Entity();
+	plane.vao = m.vao;
+	plane.textureId = loadPNGTexture("Resources/jas.png");
+	plane.numIndices = m.numIndices;
+	plane.position = glm::vec3(0, 0, -4);
+	plane.scale = glm::vec3(1, 1, 1);
+	plane.groundContactPoint = glm::vec3(0, -1, 0);
+	plane.forward = glm::vec3(0, -1, 0);
+	plane.up = glm::vec3(0, 0, -1);
 
 	glClearColor(1.0f, 1.0f, 0.0f, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -599,6 +719,7 @@ int main() {
 		// Render entities
 		renderEntity(ground, shaderProgram, cam, perspective);
 		renderEntity(box, shaderProgram, cam, perspective);
+		renderEntity(plane, shaderProgram, cam, perspective);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
