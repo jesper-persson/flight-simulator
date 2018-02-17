@@ -23,6 +23,7 @@
 
 #include <lodepng.h>
 #include "Common.h"
+#include "DiamondSquare.h"
 
 const glm::vec3 defaultForward = glm::vec3(0, 0, 1); // Depends on model
 const glm::vec3 defaultUp = glm::vec3(0, 1, 0); // Depends on model
@@ -184,7 +185,7 @@ GLuint getVAOGround() {
 	glGenBuffers(1, &textureBuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, textureBuffer);
 	glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(GLuint) * 6, textureData, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_UNSIGNED_INT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(2);
 
 	// Index
@@ -667,30 +668,41 @@ int main() {
 	GLuint shaderProgram = getShader();
 	glUseProgram(shaderProgram);
 
+	//Entity ground = Entity();
+	//ground.vao = getVAOGround();
+	//ground.numIndices = 6;
+	//ground.position = glm::vec3(0, -1.0f, 0);
+	//ground.scale = glm::vec3(4580, 1, 4580);
+	//ground.textureId = loadPNGTexture("Resources/grass512.png");
+
+	const int size = 129;
+	float heightmapData[size * size];
+	diamondSquare(heightmapData, size, 10);
+	Model terrain = heightmapToModel(heightmapData, size, size, 1, 1, 1, 50);
 	Entity ground = Entity();
-	ground.vao = getVAOGround();
-	ground.numIndices = 6;
+	ground.vao = terrain.vao;
+	ground.numIndices = terrain.numIndices;
 	ground.position = glm::vec3(0, -1.0f, 0);
-	ground.scale = glm::vec3(4580, 1, 4580);
+	ground.scale = glm::vec3(1, 1, 1);
 	ground.textureId = loadPNGTexture("Resources/grass512.png");
 
 	Entity box = Entity();
 	box.vao = getVAOBox();
 	box.numIndices = 36;
-	box.position = glm::vec3(10, 2, -3);
+	box.position = glm::vec3(0, 3, 0);
 	box.scale = glm::vec3(1, 1, 1);
 	box.groundContactPoint = glm::vec3(0, -1, 0);
 
-	Model m = tinyObjLoader("Resources/jas.obj");
-	Entity plane = Entity();
-	plane.vao = m.vao;
-	plane.textureId = loadPNGTexture("Resources/jas.png");
-	plane.numIndices = m.numIndices;
-	plane.position = glm::vec3(0, 0, -4);
-	plane.scale = glm::vec3(1, 1, 1);
-	plane.groundContactPoint = glm::vec3(0, -1, 0);
-	plane.forward = glm::vec3(0, -1, 0);
-	plane.up = glm::vec3(0, 0, -1);
+	//Model m = tinyObjLoader("Resources/jas.obj");
+	//Entity plane = Entity();
+	//plane.vao = m.vao;
+	//plane.textureId = loadPNGTexture("Resources/jas.png");
+	//plane.numIndices = m.numIndices;
+	//plane.position = glm::vec3(0, 0, -4);
+	//plane.scale = glm::vec3(1, 1, 1);
+	//plane.groundContactPoint = glm::vec3(0, -1, 0);
+	//plane.forward = glm::vec3(0, -1, 0);
+	//plane.up = glm::vec3(0, 0, -1);
 
 	glClearColor(1.0f, 1.0f, 0.0f, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -719,7 +731,7 @@ int main() {
 		// Render entities
 		renderEntity(ground, shaderProgram, cam, perspective);
 		renderEntity(box, shaderProgram, cam, perspective);
-		renderEntity(plane, shaderProgram, cam, perspective);
+		//renderEntity(plane, shaderProgram, cam, perspective);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

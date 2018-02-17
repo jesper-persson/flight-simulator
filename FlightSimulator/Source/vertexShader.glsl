@@ -9,8 +9,8 @@ uniform mat4 projectionMatrix;
 uniform mat4 worldToView;
 
 out vec2 texture_out;
-out vec3 normal_out;
-out vec3 fragment_out;
+smooth out vec3 normal_out;
+smooth out vec3 fragment_out;
 
 void main(void) {
 	normal_out = mat3(modelToWorld) * normal;

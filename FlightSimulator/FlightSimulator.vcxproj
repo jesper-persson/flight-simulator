@@ -127,6 +127,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h" />
+    <ClInclude Include="Source\DiamondSquare.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\fragmentShader.glsl" />
