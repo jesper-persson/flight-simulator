@@ -107,14 +107,9 @@ GLuint loadPNGTexture(std::string filename) {
 	unsigned width, height;
 	unsigned error = lodepng::decode(image, width, height, filename);
 
-	std::vector<unsigned char> imageCopy;
-	for (int t = height - 1; t >= 0; t--) {
-		for (int s = 0; s < width; s++) {
-			imageCopy.push_back(image[t * 4 * width + 4 * s]);
-			imageCopy.push_back(image[t * 4 * width + 4 * s + 1]);
-			imageCopy.push_back(image[t * 4 * width + 4 * s + 2]);
-			imageCopy.push_back(image[t * 4 * width + 4 * s + 3]);
-		}
+	std::vector<unsigned char> imageCopy(width * height * 4);
+	for (unsigned i = 0; i < height; i++) {
+		memcpy(&imageCopy[(height - i - 1) * width * 4], &image[i * width * 4], width * 4);
 	}
 
 	GLuint texId;
