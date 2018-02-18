@@ -124,10 +124,12 @@
     <ClCompile Include="Libraries\lodepng\lodepng.cpp" />
     <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\Main.cpp" />
+    <ClCompile Include="Source\Physics.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\DiamondSquare.h" />
+    <ClInclude Include="Source\Physics.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\fragmentShader.glsl" />

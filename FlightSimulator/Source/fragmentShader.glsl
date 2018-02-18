@@ -28,7 +28,7 @@ void main() {
 	}
 
 	if (isTerrain) {
-		if (fragment_out.x >= 3 && fragment_out.z >= 3 && fragment_out.x < 14 && fragment_out.z <= 80) {
+		if (fragment_out.x >= 3*2 && fragment_out.z >= 3*2 && fragment_out.x < 14*2 && fragment_out.z <= 80*2) {
 			gl_Color = texture(tex2, texture_out) * diffuse;
 		} else {
 			gl_Color = texture(tex, texture_out) * diffuse;

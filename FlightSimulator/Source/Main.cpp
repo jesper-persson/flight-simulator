@@ -24,6 +24,7 @@
 #include <lodepng.h>
 #include "Common.h"
 #include "DiamondSquare.h"
+#include "Physics.h"
 
 const glm::vec3 defaultForward = glm::vec3(0, 0, 1); // Depends on model
 const glm::vec3 defaultUp = glm::vec3(0, 1, 0); // Depends on model
@@ -703,16 +704,17 @@ int main() {
 
 	const int size = 129;
 	float heightmapData[size * size];
-	diamondSquare(heightmapData, size, 25);
+	diamondSquare(heightmapData, size, 8);
 	makeRunwayOnHeightmap(heightmapData, size);
-	const int tileSize = 1;
-	Model terrain = heightmapToModel(heightmapData, size, size, tileSize, tileSize, tileSize, 50);
+	const int tileSizeXZ = 2;
+	const int tileSizeY = 1;
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 50);
 	Entity ground = Entity();
 	ground.vao = terrain.vao;
 	ground.numIndices = terrain.numIndices;
 	ground.position = glm::vec3(0, 0, 0);
 	ground.scale = glm::vec3(1, 1, 1);
-	ground.textureId = loadPNGTexture("Resources/grass512.png");
+	ground.textureId = loadPNGTexture("Resources/grass1024.png");
 	ground.textureId2 = loadPNGTexture("Resources/asphalt512.png");
 
 	Entity box = Entity();
@@ -727,7 +729,7 @@ int main() {
 	plane.vao = m.vao;
 	plane.textureId = loadPNGTexture("Resources/jas.png");
 	plane.numIndices = m.numIndices;
-	plane.position = glm::vec3(8.2f, 8, 8.5f);
+	plane.position = glm::vec3(16.5f, 8, 12.5f);
 	plane.scale = glm::vec3(0.8f, 0.8f, 0.8f);
 	plane.centerToGroundContactPoint = -1;
 
@@ -737,7 +739,7 @@ int main() {
 	float i = 0;
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		basicSteering(cameraPosition, cameraForward, cameraUp);
+		//basicSteering(cameraPosition, cameraForward, cameraUp);
 
 		i += 0.01f;
 
@@ -747,23 +749,15 @@ int main() {
 		}
 
 		runPhysics(ground, box, 0.01f);
-		runPhysics(ground, plane, 0.01f);
-		terrainCollision(heightmapData, size, tileSize, plane);
-		terrainCollision(heightmapData, size, tileSize, box);
+		airplanePhysics(plane.position, plane.forward, plane.up, plane.velocity, isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0));
+		terrainCollision(heightmapData, size, tileSizeXZ, plane);
+		terrainCollision(heightmapData, size, tileSizeXZ, box);
 
 		// Normal camera
-		glm::mat4 cam = glm::lookAt(
-			cameraPosition,
-			cameraPosition + cameraForward * 10.0f,
-			cameraUp
-		);
+		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
 
-		interpolateCamera(plane.position + -plane.forward * 10.0f + plane.up * 3.0f, cameraPosition);
-		cam = glm::lookAt(
-			cameraPosition,
-			plane.position,
-			plane.up
-		);
+		interpolateCamera(plane.position + -plane.forward * 15.0f + plane.up * 3.0f, cameraPosition);
+		cam = glm::lookAt(cameraPosition, plane.position, plane.up);
 
 		// Render entities
 		renderTerrain(ground, shaderProgram, cam, perspective);
