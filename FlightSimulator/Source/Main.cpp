@@ -34,7 +34,7 @@ public:
 		position = glm::vec3(0, 0, 0);
 		scale = glm::vec3(1, 1, 1);
 		velocity = glm::vec3(0, 0, 0);
-		groundContactPoint = glm::vec3(0, 0, 0);
+		centerToGroundContactPoint = 0;
 		impulse = glm::vec3(0, 0, 0);
 		forward = defaultForward;
 		up = defaultUp;
@@ -45,9 +45,10 @@ public:
 	glm::vec3 up;
 	glm::vec3 velocity;
 	// Distance vector from center of object to point with lowest y value
-	glm::vec3 groundContactPoint;
+	float centerToGroundContactPoint;
 	glm::vec3 impulse;
 	GLuint textureId;
+	GLuint textureId2;
 	GLuint vao;
 	int numIndices;
 };
@@ -85,18 +86,37 @@ void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
 	glBindVertexArray(entity.vao);
 
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, entity.textureId);
+	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
 
 	glDrawElements(GL_TRIANGLES, entity.numIndices, GL_UNSIGNED_INT, (void*)0);
 }
 
+void renderTerrain(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, entity.textureId2);
+	glUniform1i(glGetUniformLocation(shaderProgram, "tex2"), 1);
+	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 1);
+	renderEntity(entity, shaderProgram, worldToView, perspective);
+	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 0);
+}
+
 void runPhysics(Entity &ground, Entity &entity, float dt) {
-	glm::vec3 netForce =  entity.impulse;
+	glm::vec3 gravity = glm::vec3(0, -0.4f, 0);
+	glm::vec3 netForce =  entity.impulse + gravity;
 	entity.impulse = glm::vec3(0, 0, 0);
 	entity.velocity = entity.velocity + netForce;
 	entity.position = entity.position + entity.velocity * dt;
-	if (ground.position.y > entity.position.y + entity.groundContactPoint.y) {
-		entity.position.y = ground.position.y - entity.groundContactPoint.y;
+}
+
+// Should also interpolate over triangle
+void terrainCollision(float *heightmap, int size, float tileSize, Entity &entity) {
+	int tileX = entity.position.x / tileSize;
+	int tileZ = entity.position.z / tileSize;
+	float height = heightmap[tileZ * size + tileX];
+	if (height > entity.position.y + entity.centerToGroundContactPoint) {
+		entity.position.y = height - entity.centerToGroundContactPoint;
 		entity.velocity.y = 0;
 	}
 }
@@ -117,9 +137,11 @@ GLuint loadPNGTexture(std::string filename) {
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, texId);
 	glActiveTexture(GL_TEXTURE0);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
+	glGenerateMipmap(GL_TEXTURE_2D);
 	return texId;
 }
 
@@ -639,6 +661,15 @@ Model tinyObjLoader(std::string fileName) {
 	return m;
 }
 
+void makeRunwayOnHeightmap(float *heightmap, int size) {
+	float avgHeight = heightmap[3 * size + 8] + heightmap[80 * size + 8] / 2.0f;
+	for (int x = 3; x <= 14; x++) {
+		for (int z = 3; z <= 80; z++) {
+			heightmap[z * size + x] = avgHeight;
+		}
+	}
+}
+
 int main() {
 	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, 800.0f/600.0f, .1f, 450);
 
@@ -672,32 +703,33 @@ int main() {
 
 	const int size = 129;
 	float heightmapData[size * size];
-	diamondSquare(heightmapData, size, 10);
-	Model terrain = heightmapToModel(heightmapData, size, size, 1, 1, 1, 50);
+	diamondSquare(heightmapData, size, 25);
+	makeRunwayOnHeightmap(heightmapData, size);
+	const int tileSize = 1;
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSize, tileSize, tileSize, 50);
 	Entity ground = Entity();
 	ground.vao = terrain.vao;
 	ground.numIndices = terrain.numIndices;
-	ground.position = glm::vec3(0, -1.0f, 0);
+	ground.position = glm::vec3(0, 0, 0);
 	ground.scale = glm::vec3(1, 1, 1);
 	ground.textureId = loadPNGTexture("Resources/grass512.png");
+	ground.textureId2 = loadPNGTexture("Resources/asphalt512.png");
 
 	Entity box = Entity();
 	box.vao = getVAOBox();
 	box.numIndices = 36;
 	box.position = glm::vec3(0, 3, 0);
 	box.scale = glm::vec3(1, 1, 1);
-	box.groundContactPoint = glm::vec3(0, -1, 0);
+	box.centerToGroundContactPoint = -0.6;
 
-	//Model m = tinyObjLoader("Resources/jas.obj");
-	//Entity plane = Entity();
-	//plane.vao = m.vao;
-	//plane.textureId = loadPNGTexture("Resources/jas.png");
-	//plane.numIndices = m.numIndices;
-	//plane.position = glm::vec3(0, 0, -4);
-	//plane.scale = glm::vec3(1, 1, 1);
-	//plane.groundContactPoint = glm::vec3(0, -1, 0);
-	//plane.forward = glm::vec3(0, -1, 0);
-	//plane.up = glm::vec3(0, 0, -1);
+	Model m = tinyObjLoader("Resources/jas.obj");
+	Entity plane = Entity();
+	plane.vao = m.vao;
+	plane.textureId = loadPNGTexture("Resources/jas.png");
+	plane.numIndices = m.numIndices;
+	plane.position = glm::vec3(8.2f, 8, 8.5f);
+	plane.scale = glm::vec3(0.8f, 0.8f, 0.8f);
+	plane.centerToGroundContactPoint = -1;
 
 	glClearColor(1.0f, 1.0f, 0.0f, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -715,6 +747,9 @@ int main() {
 		}
 
 		runPhysics(ground, box, 0.01f);
+		runPhysics(ground, plane, 0.01f);
+		terrainCollision(heightmapData, size, tileSize, plane);
+		terrainCollision(heightmapData, size, tileSize, box);
 
 		// Normal camera
 		glm::mat4 cam = glm::lookAt(
@@ -723,10 +758,17 @@ int main() {
 			cameraUp
 		);
 
+		interpolateCamera(plane.position + -plane.forward * 10.0f + plane.up * 3.0f, cameraPosition);
+		cam = glm::lookAt(
+			cameraPosition,
+			plane.position,
+			plane.up
+		);
+
 		// Render entities
-		renderEntity(ground, shaderProgram, cam, perspective);
+		renderTerrain(ground, shaderProgram, cam, perspective);
 		renderEntity(box, shaderProgram, cam, perspective);
-		//renderEntity(plane, shaderProgram, cam, perspective);
+		renderEntity(plane, shaderProgram, cam, perspective);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
