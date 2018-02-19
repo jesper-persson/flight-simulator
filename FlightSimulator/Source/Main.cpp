@@ -664,15 +664,15 @@ Model tinyObjLoader(std::string fileName) {
 
 void makeRunwayOnHeightmap(float *heightmap, int size) {
 	float avgHeight = heightmap[3 * size + 8] + heightmap[80 * size + 8] / 2.0f;
-	for (int x = 3; x <= 14; x++) {
-		for (int z = 3; z <= 80; z++) {
+	for (int x = 3; x <= 8; x++) {
+		for (int z = 3; z <= 30; z++) {
 			heightmap[z * size + x] = avgHeight;
 		}
 	}
 }
 
 int main() {
-	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, 800.0f/600.0f, .1f, 450);
+	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, 800.0f/600.0f, .1f, 2000);
 
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit()) {
@@ -702,13 +702,13 @@ int main() {
 	//ground.scale = glm::vec3(4580, 1, 4580);
 	//ground.textureId = loadPNGTexture("Resources/grass512.png");
 
-	const int size = 129;
+	const int size = 257;
 	float heightmapData[size * size];
-	diamondSquare(heightmapData, size, 8);
+	diamondSquare(heightmapData, size, 20.0f);
 	makeRunwayOnHeightmap(heightmapData, size);
-	const int tileSizeXZ = 2;
+	const int tileSizeXZ = 8;
 	const int tileSizeY = 1;
-	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 50);
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 200);
 	Entity ground = Entity();
 	ground.vao = terrain.vao;
 	ground.numIndices = terrain.numIndices;
@@ -729,19 +729,21 @@ int main() {
 	plane.vao = m.vao;
 	plane.textureId = loadPNGTexture("Resources/jas.png");
 	plane.numIndices = m.numIndices;
-	plane.position = glm::vec3(16.5f, 8, 12.5f);
-	plane.scale = glm::vec3(0.8f, 0.8f, 0.8f);
+	plane.position = glm::vec3(52.5f, 12, 35.5f);
+	plane.scale = glm::vec3(1.2f, 1.2f, 1.2f);
 	plane.centerToGroundContactPoint = -1;
 
 	glClearColor(1.0f, 1.0f, 0.0f, 0.0f);
 	glEnable(GL_DEPTH_TEST);
 
-	float i = 0;
+	float lastTime = glfwGetTime();
+	float currentTime;
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		float currentTime = glfwGetTime();
+		float dt = currentTime - lastTime;
+		lastTime = currentTime;
 		//basicSteering(cameraPosition, cameraForward, cameraUp);
-
-		i += 0.01f;
 
 		if (jump) {
 			jump = false;
@@ -749,7 +751,7 @@ int main() {
 		}
 
 		runPhysics(ground, box, 0.01f);
-		airplanePhysics(plane.position, plane.forward, plane.up, plane.velocity, isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0));
+		airplanePhysics(plane.position, plane.forward, plane.up, plane.velocity, isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
 		terrainCollision(heightmapData, size, tileSizeXZ, plane);
 		terrainCollision(heightmapData, size, tileSizeXZ, box);
 
