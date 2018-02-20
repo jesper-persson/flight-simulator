@@ -682,8 +682,8 @@ int main() {
 	//ground.scale = glm::vec3(4580, 1, 4580);
 	//ground.textureId = loadPNGTexture("Resources/grass512.png");
 
-	const int size = 257;
-	float heightmapData[size * size];
+	const int size = 513;
+	float *heightmapData = new float[size * size];
 	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
 	diamondSquare(heightmapData, size, 0.5f, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
@@ -754,6 +754,8 @@ int main() {
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
+
+	delete heightmapData;
 
 	return 0;
 }
