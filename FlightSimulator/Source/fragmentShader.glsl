@@ -5,10 +5,11 @@ uniform sampler2D tex2;
 uniform sampler2D tex3;
 uniform sampler2D tex4;
 uniform bool isTerrain;
+uniform mat4 worldToView;
 
 in vec2 texture_out;
-smooth  in vec3 normal_out;
-smooth  in vec3 fragment_out;
+smooth in vec3 normal_out;
+smooth in vec3 fragment_out;
 
 out vec4 gl_Color;
 
@@ -24,7 +25,7 @@ void main() {
 	// Directional light
 	vec3 lightDir = normalize(vec3(1, -2, 1));
 	vec3 fragToLight = -lightDir;
-	float diffuse = dot(fragToLight, normalize(normal_out));
+	float diffuse = dot(fragToLight, normalize(normal_out)) * 1.2;
 	if (diffuse < 0.1) {
 		diffuse = 0.1;
 	}
@@ -47,5 +48,14 @@ void main() {
 	}
 	
 	gl_Color.w = 1;
-	//gl_Color = vec4(texture_out.xy,0,1);
+
+	// Fade far away objects
+	mat4 invView = inverse(worldToView);
+	vec3 cameraPos = vec3(invView[3][0], invView[3][1], invView[3][2]);
+	float camDistance = length(cameraPos - fragment_out);
+	float distanceStartFade = 500;
+	float distanceEndFade = 800;
+	if (camDistance > distanceStartFade) {
+		gl_Color.w = mix(1, 0, (camDistance - distanceStartFade) / (distanceEndFade - distanceStartFade));
+	}
 }

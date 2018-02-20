@@ -648,7 +648,7 @@ void makeRunwayOnHeightmap(float *heightmap, int size) {
 	float avgHeight = heightmap[3 * size + 8] + heightmap[80 * size + 8] / 2.0f;
 	for (int x = 3; x <= 8; x++) {
 		for (int z = 3; z <= 30; z++) {
-			heightmap[z * size + x] = avgHeight;
+			heightmap[z * size + x] = avgHeight + 45.0f;
 		}
 	}
 }
@@ -718,8 +718,10 @@ int main() {
 	plane.scale = glm::vec3(0.5f, 0.5f, 0.5f);
 	plane.centerToGroundContactPoint = -1;
 
-	glClearColor(1.0f, 1.0f, 0.0f, 0.0f);
+	glClearColor(41/255.0f, 172/255.0f, 221/255.0f, 0.0f);
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	float lastTime = glfwGetTime();
 	float currentTime;
