@@ -40,9 +40,14 @@ void squareStep(int x, int y, int stepSize, int size, float *heightmap, float r)
 
 // Heightmap must be of size 2^n + 1
 // Smoothness
-float *diamondSquare(float *heightmap, const int size, float smoothness) {
+float *diamondSquare(float *heightmap, const int size, float smoothness, time_t seed = -1) {
+	
 	assert((float)(int)(log2(size - 1)) == log2(size - 1));
-	srand(time(NULL));
+
+	if (seed == -1) {
+		seed = time(NULL);
+	}
+	srand(seed);
 
 	// Pre seed corners
 	heightmap[WORLD_TO_INDEX(0, 0, size)] = (random(0, 500) - 250) / smoothness;
