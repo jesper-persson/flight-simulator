@@ -8,6 +8,17 @@
 #include <vector>
 #include <string>
 
+Entity::Entity() {
+	std::cout << "Körs konstruktor" << std::endl;
+	position = glm::vec3(0, 0, 0);
+	scale = glm::vec3(1, 1, 1);
+	velocity = glm::vec3(0, 0, 0);
+	centerToGroundContactPoint = 0;
+	impulse = glm::vec3(0, 0, 0);
+	forward = DEFAULT_FORWARD;
+	up = DEFAULT_UP;
+};
+
 std::string readFile(std::string path) {
 	std::ifstream t(path);
 	std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());

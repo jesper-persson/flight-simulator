@@ -26,33 +26,9 @@
 #include "DiamondSquare.h"
 #include "Physics.h"
 
-const glm::vec3 defaultForward = glm::vec3(0, 0, 1); // Depends on model
-const glm::vec3 defaultUp = glm::vec3(0, 1, 0); // Depends on model
 
-class Entity {
-public:
-	Entity() {
-		position = glm::vec3(0, 0, 0);
-		scale = glm::vec3(1, 1, 1);
-		velocity = glm::vec3(0, 0, 0);
-		centerToGroundContactPoint = 0;
-		impulse = glm::vec3(0, 0, 0);
-		forward = defaultForward;
-		up = defaultUp;
-	}
-	glm::vec3 position;
-	glm::vec3 scale;
-	glm::vec3 forward;
-	glm::vec3 up;
-	glm::vec3 velocity;
-	// Distance vector from center of object to point with lowest y value
-	float centerToGroundContactPoint;
-	glm::vec3 impulse;
-	GLuint textureId;
-	GLuint textureId2;
-	GLuint vao;
-	int numIndices;
-};
+
+
 
 glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp) {
 	glm::vec3 rotationAxis = glm::normalize(glm::cross(defaultForward, forward));
@@ -78,7 +54,7 @@ glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defau
 void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
 	glm::mat4 translation = glm::translate(glm::mat4(), entity.position);
 	glm::mat4 scale = glm::scale(glm::mat4(), entity.scale);
-	glm::quat quaternion = directionToQuaternion(entity.forward, entity.up, defaultForward, defaultUp);
+	glm::quat quaternion = directionToQuaternion(entity.forward, entity.up, DEFAULT_FORWARD, DEFAULT_UP);
 	glm::mat4 rotation = glm::toMat4(quaternion);
 
 	glm::mat4 transformation = translation * rotation * scale;
@@ -94,12 +70,18 @@ void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glDrawElements(GL_TRIANGLES, entity.numIndices, GL_UNSIGNED_INT, (void*)0);
 }
 
-void renderTerrain(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+void renderTerrain(Terrain &terrain, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, entity.textureId2);
+	glBindTexture(GL_TEXTURE_2D, terrain.getTextureId2());
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, terrain.getTextureId3());
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, terrain.getTextureId4());
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex2"), 1);
+	glUniform1i(glGetUniformLocation(shaderProgram, "tex3"), 2);
+	glUniform1i(glGetUniformLocation(shaderProgram, "tex4"), 3);
 	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 1);
-	renderEntity(entity, shaderProgram, worldToView, perspective);
+	renderEntity(terrain, shaderProgram, worldToView, perspective);
 	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 0);
 }
 
@@ -450,14 +432,14 @@ GLuint getShader() {
 	return program;
 }
 
-glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
-glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraPosition = glm::vec3(52.5f, 12, 35.5f);
+glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump;
 
 void basicSteering(glm::vec3 &position, glm::vec3 &forward, glm::vec3 &up) {
 	GLfloat rotationSpeed = 0.03f;
-	GLfloat speed = 0.25f;
+	GLfloat speed = 0.25f * 50;
 	if (isForward)
 	{
 		position = position + forward * speed;
@@ -672,7 +654,7 @@ void makeRunwayOnHeightmap(float *heightmap, int size) {
 }
 
 int main() {
-	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, 800.0f/600.0f, .1f, 2000);
+	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, 800.0f/600.0f, .1f, 4000);
 
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit()) {
@@ -704,20 +686,23 @@ int main() {
 
 	const int size = 257;
 	float heightmapData[size * size];
-	diamondSquare(heightmapData, size, 20.0f);
+	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
+	diamondSquare(heightmapData, size, 0.5f, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
 	const int tileSizeXZ = 8;
 	const int tileSizeY = 1;
-	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 200);
-	Entity ground = Entity();
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 80);
+	Terrain ground = Terrain();
 	ground.vao = terrain.vao;
 	ground.numIndices = terrain.numIndices;
 	ground.position = glm::vec3(0, 0, 0);
 	ground.scale = glm::vec3(1, 1, 1);
-	ground.textureId = loadPNGTexture("Resources/grass1024.png");
-	ground.textureId2 = loadPNGTexture("Resources/asphalt512.png");
+	ground.textureId = loadPNGTexture("Resources/grass512.png");
+	ground.setTextureId2(loadPNGTexture("Resources/sand512.png"));
+	ground.setTextureId3(loadPNGTexture("Resources/rock512.png"));
+	ground.setTextureId4(loadPNGTexture("Resources/terrain-splatmap.png"));
 
-	Entity box = Entity();
+	auto box = Entity();
 	box.vao = getVAOBox();
 	box.numIndices = 36;
 	box.position = glm::vec3(0, 3, 0);
@@ -730,7 +715,7 @@ int main() {
 	plane.textureId = loadPNGTexture("Resources/jas.png");
 	plane.numIndices = m.numIndices;
 	plane.position = glm::vec3(52.5f, 12, 35.5f);
-	plane.scale = glm::vec3(1.2f, 1.2f, 1.2f);
+	plane.scale = glm::vec3(0.5f, 0.5f, 0.5f);
 	plane.centerToGroundContactPoint = -1;
 
 	glClearColor(1.0f, 1.0f, 0.0f, 0.0f);
@@ -758,7 +743,7 @@ int main() {
 		// Normal camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
 
-		interpolateCamera(plane.position + -plane.forward * 15.0f + plane.up * 3.0f, cameraPosition);
+		interpolateCamera(plane.position + -plane.forward * 7.5f + plane.up * 3.0f, cameraPosition);
 		cam = glm::lookAt(cameraPosition, plane.position, plane.up);
 
 		// Render entities
