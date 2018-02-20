@@ -26,11 +26,9 @@
 #include "DiamondSquare.h"
 #include "Physics.h"
 
-
-
-
-
 glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp) {
+	assert(std::abs(glm::dot(forward, up)) <= 0.00001f, "Forward and up must be perpendicular");
+
 	glm::vec3 rotationAxis = glm::normalize(glm::cross(defaultForward, forward));
 	if (glm::dot(defaultForward, forward) > 0.99999f) {
 		rotationAxis = forward;
