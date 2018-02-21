@@ -11,7 +11,8 @@ int random(int min, int max) {
 }
 
 // x and y is top left of square
-void diamondStep(int x, int y, int stepSize, int size, float *heightmap, float r) {
+template<typename T>
+void diamondStep(int x, int y, int stepSize, int size, T *heightmap, float r) {
 	float avg = (heightmap[WORLD_TO_INDEX(x, y, size)]
 		+ heightmap[WORLD_TO_INDEX(x + stepSize, y, size)]
 		+ heightmap[WORLD_TO_INDEX(x, y + stepSize, size)]
@@ -20,7 +21,8 @@ void diamondStep(int x, int y, int stepSize, int size, float *heightmap, float r
 }
 
 // x and y is middle of diamond
-void squareStep(int x, int y, int stepSize, int size, float *heightmap, float r) {
+template<typename T>
+void squareStep(int x, int y, int stepSize, int size, T *heightmap, float r) {
 	float avg = 0;
 	if (y - stepSize / 2 < 0 || y + stepSize / 2 >= size || x - stepSize / 2 < 0 || x + stepSize / 2 >= size) {
 		float a = y - stepSize / 2 >= 0 ? heightmap[WORLD_TO_INDEX(x, y - stepSize / 2, size)] : 0;
@@ -40,7 +42,8 @@ void squareStep(int x, int y, int stepSize, int size, float *heightmap, float r)
 
 // Heightmap must be of size 2^n + 1
 // Smoothness
-float *diamondSquare(float *heightmap, const int size, float smoothness, time_t seed = -1) {
+template<typename T>
+T *diamondSquare(T *heightmap, const int size, float smoothness, time_t seed = -1) {
 	
 	assert((float)(int)(log2(size - 1)) == log2(size - 1));
 
