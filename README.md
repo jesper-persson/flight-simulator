@@ -1,4 +1,5 @@
 # Flight Simulator
+This is a flight simulator written in C++ with OpenGL. I created this projected to learn more about graphic programming.
 
 ## Techniques used in this project
 - Terrain generation with diamond-square algorithm
