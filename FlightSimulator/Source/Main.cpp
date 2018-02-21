@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <vector>
 #include <string>
@@ -117,274 +116,10 @@ GLuint loadPNGTexture(std::string filename) {
 	glActiveTexture(GL_TEXTURE0);
 	//glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	return texId;
-}
-
-GLuint getVAOGround() {
-	GLuint vao = 0;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	float vertexData[] = {
-		-1, 0, -1,
-		-1, 0, 1,
-		1, 0, 1,
-		-1, 0, -1,
-		1, 0, -1,
-		1, 0, 1,
-	};
-
-	float normalData[] = {
-		0, 1, 0,
-		0, 1, 0,
-		0, 1, 0,
-		0, 1, 0,
-		0, 1, 0,
-		0, 1, 0,
-	};
-
-	GLuint textureData[] = {
-		0, 1,
-		0, 0,
-		1, 0,
-		0, 1,
-		1, 1,
-		1, 0 
-	};
-
-	GLuint indexData[] = {
-		0, 1, 2, 3, 4, 5
-	};
-
-	// Vertex
-	GLuint vertexBuffer = 0;
-	glGenBuffers(1, &vertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 6, vertexData, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	// Normals
-	GLuint normalBuffer = 0;
-	glGenBuffers(1, &normalBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 6, normalData, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(1);
-
-	// Texture
-	GLuint textureBuffer = 0;
-	glGenBuffers(1, &textureBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, textureBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(GLuint) * 6, textureData, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(2);
-
-	// Index
-	GLuint indexBuffer = 0;
-	glGenBuffers(1, &indexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indexData, GL_STATIC_DRAW);
-
-	return vao;
-}
-
-GLuint getVAOTriangle() {
-	GLuint vao = 0;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	float vertexData[] = {
-		-1, 0, -2,
-		0, 1, -2,
-		1, 0, -2,
-		-1, 0, 0,
-		0, 1, 0,
-		1, 0, 0,
-		0, 0, 2,
-		0, 0, 0,
-	};
-
-	float normalData[] = {
-		-1, 1, 0,
-		0, 1, 0,
-		1, 1, 0,
-		-1, 1, 0,
-		0, 1, 0,
-		1, 1, 0,
-		0, 1, 0,
-		0, -1, 0,
-	};
-	
-	GLuint indexData[] = {
-		0, 1, 2,
-		0, 2, 3,
-		2, 3, 5,
-		0, 1, 3,
-		1, 3, 4,
-		1, 2, 4,
-		2, 4, 5,
-		3, 4, 6,
-		4, 5, 6,
-		3, 7, 6,
-		5, 6, 7
-	};
-
-	GLuint vertexBuffer = 0;
-	glGenBuffers(1, &vertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 8, vertexData, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	GLuint normalBuffer = 0;
-	glGenBuffers(1, &normalBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 8, normalData, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(1);
-
-	GLuint indexBuffer = 0;
-	glGenBuffers(1, &indexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 11 * 3, indexData, GL_STATIC_DRAW);
-
-	return vao;
-}
-
-GLuint getVAOBox() {
-	GLuint vao = 0;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	float vertexData[] = {
-		-1, -1, 1, // Front
-		-1, 1, 1,
-		1, -1, 1,
-
-		1, 1, 1, // Front
-		-1, 1, 1,
-		1, -1, 1,
-
-		-1, -1, -1, // Back
-		-1, 1, -1,
-		1, -1, -1,
-
-		1, 1, -1, // Back
-		-1, 1, -1,
-		1, -1, -1,
-
-		-1, 1, -1, // Left
-		-1, -1, -1,
-		-1, -1, 1,
-
-		-1, 1, -1, // Left
-		-1, 1, 1,
-		-1, -1, 1,
-
-		1, 1, -1, // Right
-		1, -1, -1,
-		1, -1, 1,
-
-		1, 1, -1, // Right
-		1, 1, 1,
-		1, -1, 1,
-
-		-1, 1, -1, // Top
-		-1, 1, 1,
-		1, 1, 1,
-
-		-1, 1, -1, // Top
-		1, 1, -1,
-		1, 1, 1,
-
-		-1, -1, -1, // Bottom
-		-1, -1, 1,
-		1, -1, 1,
-
-		-1, -1, -1, // Bottom
-		1, -1, -1,
-		1, -1, 1,
-	};
-
-	float normalData[] = {
-		0, 0, 1, // Front
-		0, 0, 1,
-		0, 0, 1,
-
-		0, 0, 1, // Front
-		0, 0, 1,
-		0, 0, 1,
-
-		0, 0, -1, // Back
-		0, 0, -1,
-		0, 0, -1,
-
-		0, 0, -1, // Back
-		0, 0, -1,
-		0, 0, -1,
-
-		-1, 0, 0, // Left
-		-1, 0, 0,
-		-1, 0, 0,
-
-		-1, 0, 0, // Left
-		-1, 0, 0,
-		-1, 0, 0,
-
-		1, 0, 0, // Right
-		1, 0, 0,
-		1, 0, 0,
-
-		1, 0, 0, // Right
-		1, 0, 0,
-		1, 0, 0,
-
-		0, 1, 0, // Top
-		0, 1, 0,
-		0, 1, 0,
-
-		0, 1, 0, // Top
-		0, 1, 0,
-		0, 1, 0,
-
-		0, -1, 0, // Bottom
-		0, -1, 0,
-		0, -1, 0,
-
-		0, -1, 0, // Bottom
-		0, -1, 0,
-		0, -1, 0,
-	};
-
-	GLuint indexData[] = {
-		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ,16 ,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
-	};
-
-	GLuint vertexBuffer = 0;
-	glGenBuffers(1, &vertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 36, vertexData, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	GLuint normalBuffer = 0;
-	glGenBuffers(1, &normalBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 36, normalData, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(1);
-
-
-	GLuint indexBuffer = 0;
-	glGenBuffers(1, &indexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indexData, GL_STATIC_DRAW);
-
-	return vao;
 }
 
 GLuint getShader() {
@@ -416,7 +151,14 @@ GLuint getShader() {
 	GLint isCompiledFragment = 0;
 	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &isCompiledFragment);
 	if (isCompiledFragment == GL_FALSE) {
-		std::cout << "Problem compiling shader" << std::endl;
+		GLint maxLength = 0;
+		glGetShaderiv(fragmentShader, GL_INFO_LOG_LENGTH, &maxLength);
+
+		std::vector<GLchar> infoLog(maxLength);
+		glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, &infoLog[0]);
+
+		std::string str(infoLog.begin(), infoLog.end());
+		std::cout << str << std::endl;
 	}
 
 	GLuint program = glCreateProgram();
@@ -427,7 +169,7 @@ GLuint getShader() {
 	return program;
 }
 
-glm::vec3 cameraPosition = glm::vec3(52.5f, 12, 35.5f);
+glm::vec3 cameraPosition = glm::vec3(52.5f, 512, 35.5f);
 glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump;
@@ -494,10 +236,10 @@ void handleKeyChange(bool* currentValue, int action) {
 	}
 }
 
-void interpolateCamera(glm::vec3 targetPosition, glm::vec3 &cameraPosition) {
+void interpolateCamera(glm::vec3 &targetPosition, glm::vec3 &cameraPosition) {
 	float dt = 0.01f;
-	glm::vec3 direction = targetPosition - cameraPosition;
-	cameraPosition = cameraPosition + direction * dt * glm::length(direction);
+	glm::vec3 direction = glm::normalize(targetPosition - cameraPosition);
+	cameraPosition = cameraPosition + direction * dt * glm::length(targetPosition - cameraPosition) / 1.0f * 8.0f;
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -547,20 +289,22 @@ void makeRunwayOnHeightmap(float *heightmap, int size) {
 	float avgHeight = heightmap[3 * size + 8] + heightmap[80 * size + 8] / 2.0f;
 	for (int x = 3; x <= 8; x++) {
 		for (int z = 3; z <= 30; z++) {
-			heightmap[z * size + x] = avgHeight + 45.0f;
+			heightmap[z * size + x] = avgHeight;
 		}
 	}
 }
 
 int main() {
-	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, 800.0f/600.0f, .1f, 4000);
+	const int windowHeight = 900;
+	const int windowWidth = 1700;
+	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, windowWidth / (float)windowHeight, .1f, 100000);
 
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit()) {
 		exit(EXIT_FAILURE);
 	}
 
-	GLFWwindow* window = glfwCreateWindow(800, 600, "Fligt Simulator", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "Flight Simulator", NULL, NULL);
 	if (window == NULL) {
 		std::cerr << "Error! Failed to create Window!" << std::endl;
 		glfwTerminate();
@@ -576,21 +320,15 @@ int main() {
 	GLuint shaderProgram = getShader();
 	glUseProgram(shaderProgram);
 
-	//Entity ground = Entity();
-	//ground.vao = getVAOGround();
-	//ground.numIndices = 6;
-	//ground.position = glm::vec3(0, -1.0f, 0);
-	//ground.scale = glm::vec3(4580, 1, 4580);
-	//ground.textureId = loadPNGTexture("Resources/grass512.png");
-
-	const int size = 513;
-	float *heightmapData = new float[size * size];
-	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
-	diamondSquare(heightmapData, size, 0.5f, seed);
-	makeRunwayOnHeightmap(heightmapData, size);
-	const int tileSizeXZ = 8;
+	const int size = 2049;
+	const int tileSizeXZ = 32;
 	const int tileSizeY = 1;
-	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 80);
+	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
+	float *heightmapData = new float[size * size];
+	diamondSquare(heightmapData, size, 0.05f, seed);
+	makeRunwayOnHeightmap(heightmapData, size);
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 100);
+
 	Terrain ground = Terrain();
 	ground.vao = terrain.vao;
 	ground.numIndices = terrain.numIndices;
@@ -601,26 +339,21 @@ int main() {
 	ground.setTextureId3(loadPNGTexture("Resources/rock512.png"));
 	ground.setTextureId4(loadPNGTexture("Resources/terrain-splatmap.png"));
 
-	auto box = Entity();
-	box.vao = getVAOBox();
-	box.numIndices = 36;
-	box.position = glm::vec3(0, 3, 0);
-	box.scale = glm::vec3(1, 1, 1);
-	box.centerToGroundContactPoint = -0.6;
-
 	Model m = tinyObjLoader("Resources/jas.obj");
 	Entity plane = Entity();
 	plane.vao = m.vao;
 	plane.textureId = loadPNGTexture("Resources/jas.png");
 	plane.numIndices = m.numIndices;
-	plane.position = glm::vec3(52.5f, 12, 35.5f);
+	plane.position = glm::vec3((size * tileSizeXZ)/(float)2, 112, (size * tileSizeXZ) / (float)2);
 	plane.scale = glm::vec3(0.5f, 0.5f, 0.5f);
 	plane.centerToGroundContactPoint = -1;
 
-	glClearColor(41/255.0f, 172/255.0f, 221/255.0f, 0.0f);
+	glClearColor(0.27, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glFrontFace(GL_CCW);
+	glCullFace(GL_BACK);
 
 	float lastTime = glfwGetTime();
 	float currentTime;
@@ -629,27 +362,20 @@ int main() {
 		float currentTime = glfwGetTime();
 		float dt = currentTime - lastTime;
 		lastTime = currentTime;
-		//basicSteering(cameraPosition, cameraForward, cameraUp);
+		basicSteering(cameraPosition, cameraForward, cameraUp);
 
-		if (jump) {
-			jump = false;
-			box.impulse = glm::vec3(0, 20, 0);
-		}
-
-		runPhysics(ground, box, 0.01f);
 		airplanePhysics(plane.position, plane.forward, plane.up, plane.velocity, isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
 		terrainCollision(heightmapData, size, tileSizeXZ, plane);
-		terrainCollision(heightmapData, size, tileSizeXZ, box);
 
 		// Normal camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
 
-		interpolateCamera(plane.position + -plane.forward * 7.5f + plane.up * 3.0f, cameraPosition);
-		cam = glm::lookAt(cameraPosition, plane.position, plane.up);
+		//glm::vec3 targetposition = plane.position + -plane.forward * 7.5f + plane.up * 3.0f;
+		//interpolatecamera(targetposition, cameraposition);
+		//cam = glm::lookat(cameraposition, plane.position, plane.up);
 
 		// Render entities
 		renderTerrain(ground, shaderProgram, cam, perspective);
-		renderEntity(box, shaderProgram, cam, perspective);
 		renderEntity(plane, shaderProgram, cam, perspective);
 
 		glfwSwapBuffers(window);
