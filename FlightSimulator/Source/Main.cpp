@@ -5,9 +5,6 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -545,102 +542,6 @@ static void error_callback(int error, const char* description) {
 	fprintf(stderr, "Error: %s\n", description);
 }
 
-Model tinyObjLoader(std::string fileName) {
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-
-	std::string err;
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, fileName.c_str());
-
-	if (!err.empty()) {
-		std::cerr << err << std::endl;
-	}
-
-	std::vector<GLfloat> vertices;
-	std::vector<GLfloat> normals;
-	std::vector<GLfloat> textures;
-	std::vector<GLuint> indices;
-
-	// Loop over shapes
-	int i = 0;
-	for (size_t s = 0; s < shapes.size(); s++) {
-		
-		// Loop over faces (polygon)
-		size_t index_offset = 0;
-		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-			int fv = shapes[s].mesh.num_face_vertices[f];
-			
-			// Loop over vertices in the face.
-			for (size_t v = 0; v < fv; v++) {
-				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-				tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
-				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
-				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
-				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
-				tinyobj::real_t tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-				tinyobj::real_t ty = attrib.texcoords[2 * idx.texcoord_index + 1];
-
-				vertices.push_back(vx);
-				vertices.push_back(vy);
-				vertices.push_back(vz);
-				normals.push_back(nx);
-				normals.push_back(ny);
-				normals.push_back(nz);
-				textures.push_back(tx);
-				textures.push_back(ty);
-				indices.push_back(i);
-				i++;
-			}
-			index_offset += fv;
-
-			// per-face material
-			shapes[s].mesh.material_ids[f];
-		}
-	}
-
-	GLfloat *vertexData = &vertices[0];
-	GLfloat *normalData = &normals[0];
-	GLfloat *textureData = &textures[0];
-	GLuint *indexData = &indices[0];
-
-	GLuint vao = 0;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	GLuint vertexBuffer = 0;
-	glGenBuffers(1, &vertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertexData, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	GLuint normalBuffer = 0;
-	glGenBuffers(1, &normalBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
-	glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(GLfloat), normalData, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(1);
-
-	GLuint textureBuffer = 0;
-	glGenBuffers(1, &textureBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, textureBuffer);
-	glBufferData(GL_ARRAY_BUFFER, textures.size() * sizeof(GLfloat), textureData, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(2);
-
-	GLuint indexBuffer = 0;
-	glGenBuffers(1, &indexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * indices.size(), indexData, GL_STATIC_DRAW);
-
-	Model m;
-	m.numIndices = vertices.size();
-	m.vao = vao;
-	return m;
-}
 
 void makeRunwayOnHeightmap(float *heightmap, int size) {
 	float avgHeight = heightmap[3 * size + 8] + heightmap[80 * size + 8] / 2.0f;
