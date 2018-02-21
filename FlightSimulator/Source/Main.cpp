@@ -50,17 +50,14 @@ void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glm::mat4 scale = glm::scale(glm::mat4(), entity.scale);
 	glm::quat quaternion = directionToQuaternion(entity.forward, entity.up, DEFAULT_FORWARD, DEFAULT_UP);
 	glm::mat4 rotation = glm::toMat4(quaternion);
-
 	glm::mat4 transformation = translation * rotation * scale;
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
 	glBindVertexArray(entity.vao);
-
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, entity.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
-
 	glDrawElements(GL_TRIANGLES, entity.numIndices, GL_UNSIGNED_INT, (void*)0);
 }
 
@@ -77,6 +74,24 @@ void renderTerrain(Terrain &terrain, GLuint shaderProgram, glm::mat4 &worldToVie
 	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 1);
 	renderEntity(terrain, shaderProgram, worldToView, perspective);
 	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 0);
+}
+
+void renderSkybox(Entity &skybox, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+	glDisable(GL_DEPTH_TEST);
+	glm::mat4 translation = glm::translate(glm::mat4(), skybox.position);
+	glm::mat4 scale = glm::scale(glm::mat4(), skybox.scale);
+	glm::mat4 transformation = translation * scale;
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
+	glBindVertexArray(skybox.vao);
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.textureId);
+	glUniform1i(glGetUniformLocation(shaderProgram, "isSkybox"), 1);
+	glUniform1i(glGetUniformLocation(shaderProgram, "cubeMap"), 10);
+	glDrawElements(GL_TRIANGLES, skybox.numIndices, GL_UNSIGNED_INT, (void*)0);
+	glUniform1i(glGetUniformLocation(shaderProgram, "isSkybox"), 0);
+	glEnable(GL_DEPTH_TEST);
 }
 
 void runPhysics(Entity &ground, Entity &entity, float dt) {
@@ -98,6 +113,18 @@ void terrainCollision(float *heightmap, int size, float tileSize, Entity &entity
 	}
 }
 
+std::vector<unsigned char> loadPNG(std::string filename) {
+	const char* filenameC = (const char*)filename.c_str();
+	std::vector<unsigned char> image;
+	unsigned width, height;
+	unsigned error = lodepng::decode(image, width, height, filename);
+	std::vector<unsigned char> imageCopy(width * height * 4);
+	for (unsigned i = 0; i < height; i++) {
+		memcpy(&imageCopy[(height - i - 1) * width * 4], &image[i * width * 4], width * 4);
+	}
+	return image;
+}
+
 GLuint loadPNGTexture(std::string filename) {
 	const char* filenameC = (const char*)filename.c_str();
 	std::vector<unsigned char> image;
@@ -114,12 +141,115 @@ GLuint loadPNGTexture(std::string filename) {
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, texId);
 	glActiveTexture(GL_TEXTURE0);
-	//glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	return texId;
+}
+
+GLuint createSkybox() {
+	GLuint texId;
+	glGenTextures(1, &texId);
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
+
+	std::vector<unsigned char> xPos = loadPNG("Resources/skybox-x-.png");
+	std::vector<unsigned char> xNeg = loadPNG("Resources/skybox-x+.png");
+	std::vector<unsigned char> yPos = loadPNG("Resources/skybox-y+.png");
+	std::vector<unsigned char> yNeg = loadPNG("Resources/skybox-y-.png");
+	std::vector<unsigned char> zPos = loadPNG("Resources/skybox-z+.png");
+	std::vector<unsigned char> zNeg = loadPNG("Resources/skybox-z-.png");
+	const int size = 2048; // Should be returned from loader
+
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &xPos[0]);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &xNeg[0]);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &yPos[0]);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &yNeg[0]);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &zPos[0]);
+	glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &zNeg[0]);
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	return texId;
+}
+
+GLuint getVAOBox() {
+	GLuint vao = 0;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	float vertexData[] = {
+		-1, -1, 1, // Front
+		-1, 1, 1,
+		1, -1, 1,
+
+		1, 1, 1, // Front
+		-1, 1, 1,
+		1, -1, 1,
+
+		-1, -1, -1, // Back
+		-1, 1, -1,
+		1, -1, -1,
+
+		1, 1, -1, // Back
+		-1, 1, -1,
+		1, -1, -1,
+
+		-1, 1, -1, // Left
+		-1, -1, -1,
+		-1, -1, 1,
+
+		-1, 1, -1, // Left
+		-1, 1, 1,
+		-1, -1, 1,
+
+		1, 1, -1, // Right
+		1, -1, -1,
+		1, -1, 1,
+
+		1, 1, -1, // Right
+		1, 1, 1,
+		1, -1, 1,
+
+		-1, 1, -1, // Top
+		-1, 1, 1,
+		1, 1, 1,
+
+		-1, 1, -1, // Top
+		1, 1, -1,
+		1, 1, 1,
+
+		-1, -1, -1, // Bottom
+		-1, -1, 1,
+		1, -1, 1,
+
+		-1, -1, -1, // Bottom
+		1, -1, -1,
+		1, -1, 1,
+	};
+
+	GLuint indexData[] = {
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ,16 ,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+	};
+
+	GLuint vertexBuffer = 0;
+	glGenBuffers(1, &vertexBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 36, vertexData, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	GLuint indexBuffer = 0;
+	glGenBuffers(1, &indexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indexData, GL_STATIC_DRAW);
+
+	return vao;
 }
 
 GLuint getShader() {
@@ -169,7 +299,7 @@ GLuint getShader() {
 	return program;
 }
 
-glm::vec3 cameraPosition = glm::vec3(52.5f, 512, 35.5f);
+glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
 glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump;
@@ -325,7 +455,7 @@ int main() {
 	const int tileSizeY = 1;
 	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
 	float *heightmapData = new float[size * size];
-	diamondSquare(heightmapData, size, 0.05f, seed);
+	diamondSquare(heightmapData, size, 0.03f, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
 	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 100);
 
@@ -347,6 +477,13 @@ int main() {
 	plane.position = glm::vec3((size * tileSizeXZ)/(float)2, 112, (size * tileSizeXZ) / (float)2);
 	plane.scale = glm::vec3(0.5f, 0.5f, 0.5f);
 	plane.centerToGroundContactPoint = -1;
+
+	Entity skybox = Entity();
+	skybox.vao = getVAOBox();
+	skybox.numIndices = 6 * 6;
+	skybox.scale = glm::vec3(20, 20, 20);
+	skybox.position = glm::vec3(0, -10, 0);
+	skybox.textureId = createSkybox();
 
 	glClearColor(0.27, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -375,6 +512,7 @@ int main() {
 		//cam = glm::lookat(cameraposition, plane.position, plane.up);
 
 		// Render entities
+		renderSkybox(skybox, shaderProgram, cam, perspective);
 		renderTerrain(ground, shaderProgram, cam, perspective);
 		renderEntity(plane, shaderProgram, cam, perspective);
 
