@@ -26,66 +26,66 @@ std::string readFile(std::string path) {
 }
 
 Model heightmapToModel(float *heightmap, int width, int height, float scaleX, float scaleY, float scaleZ, float textureScale) {
-	std::vector<float> positionsV;
-	std::vector<float> normalsV;
-	std::vector<float> textureCoordinatesV;
-	std::vector<int> indicesV;
+	float *positions = new float[width * height * 3];
+	float *normals = new float[width * height * 3];
+	float *textureCoordinates = new float[width * height * 2];
+	int *indices = new int[(width - 1) * (height - 1) * 6];
 
-	// Populate positions, normals and textureCoordinats
 	for (int z = 0; z < height; z++) {
 		for (int x = 0; x < width; x++) {
-			positionsV.push_back(x * scaleX);
-			positionsV.push_back(heightmap[width * z + x] * scaleY);
-			positionsV.push_back(z * scaleZ);
-			textureCoordinatesV.push_back(((float)x / (float)(width - 1)) * textureScale);
-			textureCoordinatesV.push_back((1 - (float)z / (float)(height - 1)) * textureScale);
+			positions[(z * width + x) * 3] = x * scaleX;
+			positions[(z * width + x) * 3 + 1] = heightmap[width * z + x] * scaleY;
+			positions[(z * width + x) * 3 + 2] = z * scaleZ;
+			textureCoordinates[(z * width + x) * 2] = ((float)x / (float)(width - 1)) * textureScale;
+			textureCoordinates[(z * width + x) * 2 + 1] = (1 - (float)z / (float)(height - 1)) * textureScale;
 
 			// Calc normals
 			if (x == width - 1 || z == height - 1 || x == 0 || z == 0) {
-				normalsV.push_back(0);
-				normalsV.push_back(1);
-				normalsV.push_back(0);
+				normals[(z * width + x) * 3] = 0;
+				normals[(z * width + x) * 3 + 1] = 1;
+				normals[(z * width + x) * 3 + 2] = 0;
 			} else {
 				glm::vec3 ab = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
 				glm::vec3 ac = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
 				glm::vec3 normal1 = glm::normalize(glm::cross(ac, ab));
-				glm::vec3 ad = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
-				glm::vec3 ae = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
-				glm::vec3 normal2 = glm::normalize(glm::cross(ae, ad));
-				glm::vec3 af = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
-				glm::vec3 ag = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
-				glm::vec3 normal3 = glm::normalize(glm::cross(af, ag));
-				glm::vec3 ah = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
-				glm::vec3 ai = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
-				glm::vec3 normal4 = glm::normalize(glm::cross(ah, ai));
-				glm::vec3 normal = glm::normalize(normal1 + normal2 + normal3 + normal4);
-				normalsV.push_back(normal.x);
-				normalsV.push_back(normal.y);
-				normalsV.push_back(normal.z);
+				//glm::vec3 ad = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
+				//glm::vec3 ae = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
+				//glm::vec3 normal2 = glm::normalize(glm::cross(ae, ad));
+				//glm::vec3 af = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
+				//glm::vec3 ag = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
+				//glm::vec3 normal3 = glm::normalize(glm::cross(af, ag));
+				//glm::vec3 ah = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
+				//glm::vec3 ai = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
+				//glm::vec3 normal4 = glm::normalize(glm::cross(ah, ai));
+				//glm::vec3 normal = glm::normalize(normal1 + normal2 + normal3 + normal4);
+				normals[(z * width + x) * 3] = normal1.x;
+				normals[(z * width + x) * 3 + 1] = normal1.y;
+				normals[(z * width + x) * 3 + 2] = normal1.z;
 			}
 
 			// Indices
 			if (x != width - 1 && z != height - 1) {
 				int index = z * width + x;
-				indicesV.push_back(index);
-				indicesV.push_back(index + 1);
-				indicesV.push_back(index + width);
-				indicesV.push_back(index + 1);
-				indicesV.push_back(index + width + 1);
-				indicesV.push_back(index + width);
+				int arrayIndex = z * (width - 1) + x;
+				indices[arrayIndex * 6] = index;
+				indices[arrayIndex * 6 + 1] = index + 1;
+				indices[arrayIndex * 6 + 2] = index + width;
+				indices[arrayIndex * 6 + 3] = index + 1;
+				indices[arrayIndex * 6 + 4] = index + width + 1;
+				indices[arrayIndex * 6 + 5] = index + width;
 			}
 		}
 	}
 
-	float *positions = &positionsV[0];
-	float *normals = &normalsV[0];
-	float *textureCoordinates = &textureCoordinatesV[0];
-	int *indices = &indicesV[0];
-
-	return modelFromVertexData(positions, width * height * 3,
+	Model m = modelFromVertexData(positions, width * height * 3,
 							  normals, width * height * 3,
 							  textureCoordinates, width * height * 2,
 							  indices, (width - 1) * (height - 1) * 6);
+	delete indices;
+	delete positions;
+	delete normals;
+	delete textureCoordinates;
+	return m;
 }
 
 // Sizes given in amounts
