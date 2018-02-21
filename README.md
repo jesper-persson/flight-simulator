@@ -1,1 +1,18 @@
-# flight-simulator
+# Flight Simulator
+
+## Techniques used in this project
+- Terrain generation with diamond-square algorithm
+- Splat maps
+- Diffuse lighting
+
+## To add
+- Shadows using depth buffer
+- Normal maps
+- Displacement maps
+- Post processing shader
+- Particle system
+- Sky box (using cube map)
+
+## Disclaimer
+- None of the 3d models were modelled by me
+- Some textures were not created by me
