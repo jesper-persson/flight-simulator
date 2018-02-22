@@ -8,6 +8,8 @@
 #include <vector>
 #include <string>
 
+#include <memory>
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
@@ -29,24 +31,24 @@ std::string readFile(std::string path) {
 }
 
 Model heightmapToModel(float *heightmap, int width, int height, float scaleX, float scaleY, float scaleZ, float textureScale) {
-	float *positions = new float[width * height * 3];
-	float *normals = new float[width * height * 3];
-	float *textureCoordinates = new float[width * height * 2];
-	int *indices = new int[(width - 1) * (height - 1) * 6];
+	std::unique_ptr<float> positions(new float[width * height * 3]);
+	std::unique_ptr<float> normals(new float[width * height * 3]);
+	std::unique_ptr<float> textureCoordinates(new float[width * height * 2]);
+	std::unique_ptr<int> indices(new int[(width - 1) * (height - 1) * 6]);
 
 	for (int z = 0; z < height; z++) {
 		for (int x = 0; x < width; x++) {
-			positions[(z * width + x) * 3] = x * scaleX;
-			positions[(z * width + x) * 3 + 1] = heightmap[width * z + x] * scaleY;
-			positions[(z * width + x) * 3 + 2] = z * scaleZ;
-			textureCoordinates[(z * width + x) * 2] = ((float)x / (float)(width - 1)) * textureScale;
-			textureCoordinates[(z * width + x) * 2 + 1] = (1 - (float)z / (float)(height - 1)) * textureScale;
+			positions.get()[(z * width + x) * 3] = x * scaleX;
+			positions.get()[(z * width + x) * 3 + 1] = heightmap[width * z + x] * scaleY;
+			positions.get()[(z * width + x) * 3 + 2] = z * scaleZ;
+			textureCoordinates.get()[(z * width + x) * 2] = ((float)x / (float)(width - 1)) * textureScale;
+			textureCoordinates.get()[(z * width + x) * 2 + 1] = (1 - (float)z / (float)(height - 1)) * textureScale;
 
 			// Calc normals
 			if (x == width - 1 || z == height - 1 || x == 0 || z == 0) {
-				normals[(z * width + x) * 3] = 0;
-				normals[(z * width + x) * 3 + 1] = 1;
-				normals[(z * width + x) * 3 + 2] = 0;
+				normals.get()[(z * width + x) * 3] = 0;
+				normals.get()[(z * width + x) * 3 + 1] = 1;
+				normals.get()[(z * width + x) * 3 + 2] = 0;
 			} else {
 				glm::vec3 ab = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
 				glm::vec3 ac = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
@@ -61,34 +63,29 @@ Model heightmapToModel(float *heightmap, int width, int height, float scaleX, fl
 				//glm::vec3 ai = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
 				//glm::vec3 normal4 = glm::normalize(glm::cross(ah, ai));
 				//glm::vec3 normal = glm::normalize(normal1 + normal2 + normal3 + normal4);
-				normals[(z * width + x) * 3] = normal1.x;
-				normals[(z * width + x) * 3 + 1] = normal1.y;
-				normals[(z * width + x) * 3 + 2] = normal1.z;
+				normals.get()[(z * width + x) * 3] = normal1.x;
+				normals.get()[(z * width + x) * 3 + 1] = normal1.y;
+				normals.get()[(z * width + x) * 3 + 2] = normal1.z;
 			}
 
 			// Indices
 			if (x != width - 1 && z != height - 1) {
 				int index = z * width + x;
 				int arrayIndex = z * (width - 1) + x;
-				indices[arrayIndex * 6] = index;
-				indices[arrayIndex * 6 + 1] = index + 1;
-				indices[arrayIndex * 6 + 2] = index + width;
-				indices[arrayIndex * 6 + 3] = index + 1;
-				indices[arrayIndex * 6 + 4] = index + width + 1;
-				indices[arrayIndex * 6 + 5] = index + width;
+				indices.get()[arrayIndex * 6] = index;
+				indices.get()[arrayIndex * 6 + 1] = index + 1;
+				indices.get()[arrayIndex * 6 + 2] = index + width;
+				indices.get()[arrayIndex * 6 + 3] = index + 1;
+				indices.get()[arrayIndex * 6 + 4] = index + width + 1;
+				indices.get()[arrayIndex * 6 + 5] = index + width;
 			}
 		}
 	}
 
-	Model m = modelFromVertexData(positions, width * height * 3,
-							  normals, width * height * 3,
-							  textureCoordinates, width * height * 2,
-							  indices, (width - 1) * (height - 1) * 6);
-	delete indices;
-	delete positions;
-	delete normals;
-	delete textureCoordinates;
-	return m;
+	return modelFromVertexData(positions.get(), width * height * 3,
+							  normals.get(), width * height * 3,
+							  textureCoordinates.get(), width * height * 2,
+							  indices.get(), (width - 1) * (height - 1) * 6);
 }
 
 // Sizes given in amounts (that is size of the array)
