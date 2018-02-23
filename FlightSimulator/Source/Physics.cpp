@@ -6,52 +6,73 @@
 #include <glm/gtx/rotate_vector.hpp> 
 
 void steerAirplane(Entity &main, Entity &aileronLeft, Entity &aileronRight, Entity &leftFlap, Entity &rightFlap, int thrust, int roll, int pitch, float dt) {
-	if (roll) {
-		glm::vec3 rotAxis = glm::normalize(glm::vec3(1, 0, 0));
-		const float maxAngle = 0.7f;
-		float rotAmount = 0.01f * (float)roll;
+	// Roll
+	{
+		float rotAmountRoll = -dt * 1.9f;
+		if (roll) {
+			rotAmountRoll *= (float)roll;
+		}
+		else {
+			rotAmountRoll *= glm::dot(aileronLeft.forward, DEFAULT_UP) > 0 ? 1 : -1;
+		}
 
-		rotateEntity(aileronLeft, rotAxis, rotAmount);
-		rotateEntity(aileronRight, rotAxis, -rotAmount);
-		float newAngle = acos(glm::dot(DEFAULT_FORWARD, aileronLeft.forward));
-		if (newAngle > maxAngle) {
+		glm::vec3 rotAxis = glm::normalize(glm::vec3(1, 0, 0));
+		const float maxAngleRoll = 0.7f;
+
+		rotateEntity(aileronLeft, rotAxis, -rotAmountRoll);
+		rotateEntity(aileronRight, rotAxis, rotAmountRoll);
+		float newAngleRoll = acos(glm::dot(DEFAULT_FORWARD, aileronLeft.forward));
+		if (newAngleRoll > maxAngleRoll) {
 			aileronLeft.forward = DEFAULT_FORWARD;
 			aileronLeft.up = DEFAULT_UP;
 			aileronRight.forward = DEFAULT_FORWARD;
 			aileronRight.up = DEFAULT_UP;
-			rotateEntity(aileronLeft, rotAxis, (float)roll*maxAngle);
-			rotateEntity(aileronRight, rotAxis, -(float)roll*maxAngle);
+			rotateEntity(aileronLeft, rotAxis, (float)roll*maxAngleRoll);
+			rotateEntity(aileronRight, rotAxis, -(float)roll*maxAngleRoll);
 		}
 	}
+	
+	// Pitch
+	{
+		float rotAmountPitch = -dt * 1.9f;
+		if (pitch) {
+			rotAmountPitch *= (float)pitch;
+		}
+		else {
+			rotAmountPitch *= glm::dot(leftFlap.forward, DEFAULT_UP) > 0 ? -1 : 1;
+		}
 
-	if (pitch) {
 		glm::vec3 rotAxis = glm::normalize(glm::vec3(1, 0, 0));
-		const float maxAngle = 0.7f;
-		float rotAmount = 0.01f * (float)pitch;
+		const float maxAnglePitch = 0.7f;
 
-		rotateEntity(leftFlap, rotAxis, rotAmount);
-		rotateEntity(rightFlap, rotAxis, rotAmount);
-		float newAngle = acos(glm::dot(DEFAULT_FORWARD, leftFlap.forward));
-		if (newAngle > maxAngle) {
+		rotateEntity(leftFlap, rotAxis, rotAmountPitch);
+		rotateEntity(rightFlap, rotAxis, rotAmountPitch);
+		float newAnglePitch = acos(glm::dot(DEFAULT_FORWARD, leftFlap.forward));
+		if (newAnglePitch > maxAnglePitch) {
 			leftFlap.forward = DEFAULT_FORWARD;
 			leftFlap.up = DEFAULT_UP;
 			rightFlap.forward = DEFAULT_FORWARD;
 			rightFlap.up = DEFAULT_UP;
-			rotateEntity(leftFlap, rotAxis, (float)pitch*maxAngle);
-			rotateEntity(rightFlap, rotAxis, (float)pitch*maxAngle);
+			rotateEntity(leftFlap, rotAxis, -(float)pitch*maxAnglePitch);
+			rotateEntity(rightFlap, rotAxis, -(float)pitch*maxAnglePitch);
 		}
 	}
 }
 
 // dt in seconds
 // assumes 1 distance unit in the game is 1 meter
-void airplanePhysics(Entity &entity, glm::vec3 &position, glm::vec3 &forward, glm::vec3 &up, glm::vec3 &velocity, int thrust, int roll, int pitch, float dt) {
+void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, int thrust, int roll, int pitch, float dt) {
 	float mass = 1000;
 	float gravitationalAcceleration = 9.82f;
-	float maxThrustForce = 30000; // Newtons
+	float maxThrustForce = 40000; // Newtons
 	float maxBreakForce = 2000; // Newtons
-	float airResistanceConstant = 3; // Includes density and area
+	float airResistanceConstant = 4; // Includes density and area
 	float liftConstant = 160;
+
+	glm::vec3 &up = entity.up;
+	glm::vec3 &forward = entity.forward;
+	glm::vec3 &velocity = entity.velocity;
+	glm::vec3 &position = entity.position;
 
 	glm::vec3 thrustForce = forward * (float)thrust * (thrust == 1 ? maxThrustForce : maxBreakForce);
 	
@@ -64,16 +85,24 @@ void airplanePhysics(Entity &entity, glm::vec3 &position, glm::vec3 &forward, gl
 	}
 
 	// Pitch
-	float rotationSpeedPitch = 0.0099f * pitch * glm::length(velocity) / 100;
-	glm::vec3 right = glm::cross(forward, up);
-	forward = glm::normalize(glm::rotate(forward, rotationSpeedPitch, right));
-	up = glm::normalize(glm::rotate(up, rotationSpeedPitch, right));
+	float attackAnglePitch = acos(glm::dot(leftFlap.forward, DEFAULT_FORWARD));
+	if (glm::dot(leftFlap.forward, DEFAULT_UP) < 0) { // Lift
+		attackAnglePitch = -attackAnglePitch;
+	}
+	float rotationSpeedPitch = 0.0003f * attackAnglePitch * glm::length(velocity);
+	glm::vec3 right = glm::normalize(glm::cross(forward, up));
+	rotateEntity(entity, right, rotationSpeedPitch);
 	
 	// Roll
-	float rotationSpeedRoll = -0.035f * roll * glm::length(velocity) / 90;
+	float attackAngleRoll = acos(glm::dot(aileronLeft.forward, DEFAULT_FORWARD));
+	if (glm::dot(aileronLeft.forward, DEFAULT_UP) < 0) { // Lift
+		attackAngleRoll = -attackAngleRoll;
+	}
+	float rotationSpeedRoll = 0.001f * attackAngleRoll * glm::length(velocity);
 	up = glm::normalize(glm::rotate(up, rotationSpeedRoll, forward));
 
-	glm::vec3 liftForce = up * dot(forward, velocity) * (liftConstant + pitch * 1);
+
+	glm::vec3 liftForce = up * dot(forward, velocity) * (liftConstant);
 
 	glm::vec3 gravity = glm::vec3(0, -mass * gravitationalAcceleration, 0);
 

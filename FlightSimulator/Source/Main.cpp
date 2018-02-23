@@ -478,6 +478,7 @@ int main() {
 	std::vector<Entity*> airplane = loadJAS39Gripen("Resources/jas.obj");
 	airplane[0]->position = glm::vec3(10, 100, 10);
 	airplane[0]->scale = glm::vec3(0.2f, 0.2f, 0.2f);
+	airplane[0]->centerToGroundContactPoint = -0.2f;
 	for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
 		(*iter)->textureId = jasTexture;
 	}
@@ -508,13 +509,13 @@ int main() {
 		basicSteering(cameraPosition, cameraForward, cameraUp);
 
 		steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
-		//airplanePhysics(*airplane[0], airplane[0]->position, airplane[0]->forward, airplane[0]->up, airplane[0]->velocity, isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
-		//terrainCollision(heightmapData, size, tileSizeXZ, plane);
+		airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		terrainCollision(heightmapData, size, tileSizeXZ, *airplane[0]);
 
 		// Normal camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
 
-		glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f + airplane[0]->up * 1.0f;
+		glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f;
 		interpolateCamera(targetPosition, cameraPosition);
 		cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
 
