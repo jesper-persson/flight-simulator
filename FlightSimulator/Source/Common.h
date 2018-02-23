@@ -1,9 +1,24 @@
 #include <string>
 #include <glad\glad.h>
 #include <glm\vec3.hpp>
+#include <iostream>
+#include <vector>
+
+#ifndef COMMON_H
+#define COMMON_H
 
 const glm::vec3 DEFAULT_FORWARD = glm::vec3(0, 0, 1);
 const glm::vec3 DEFAULT_UP = glm::vec3(0, 1, 0);
+
+struct Model {
+public:
+	Model() : offset(0) {
+
+	}
+	GLuint vao;
+	int offset;
+	int numIndices;
+};
 
 class Entity {
 public:
@@ -16,8 +31,35 @@ public:
 	float centerToGroundContactPoint; // For terrain collision
 	glm::vec3 impulse;
 	GLuint textureId;
-	GLuint vao;
-	int numIndices;
+	Model& getModel() {
+		return model;
+	}
+	void setModel(Model model) {
+		this->model = model;
+	}
+	Entity *getParentEntity() {
+		return parentEntity;
+	}
+	void setParentEntity(Entity *parentEntity) {
+		this->parentEntity = parentEntity;
+	}
+	glm::vec3 getRotationPivot() {
+		return rotationPivot;
+	}
+	void setRotationPivot(glm::vec3 rotationPivot) {
+		this->rotationPivot = rotationPivot;
+	}
+	void setName(std::string &name) {
+		this->name = name;
+	}
+	std::string& getName() {
+		return name;
+	}
+private:
+	std::string name;
+	Entity *parentEntity;
+	Model model;
+	glm::vec3 rotationPivot;
 };
 
 class Terrain : public Entity {
@@ -48,14 +90,14 @@ private:
 
 std::string readFile(std::string path);
 
-struct Model {
-public:
-	GLuint vao;
-	int numIndices;
-};
-
 Model heightmapToModel(float *heightmap, int width, int height, float scaleX, float scaleY, float scaleZ, float textureScale);
 
 Model modelFromVertexData(float vertexCoordinates[], int vertexCoordinatesSize, float normals[], int normalsSize, float textureCoordinates[], int textureCoordinatesSize, int indices[], int indicesSize);
 
 Model tinyObjLoader(std::string fileName);
+
+std::vector<Entity*> loadJAS39Gripen(std::string filename);
+
+void rotateEntity(Entity &entity, glm::vec3 axis, float amount);
+
+#endif

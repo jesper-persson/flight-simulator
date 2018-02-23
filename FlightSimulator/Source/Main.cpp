@@ -45,20 +45,30 @@ glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defau
 	return  quatUp * quatForward;
 }
 
-void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+glm::mat4 getEntityTransformation(Entity &entity) {
+	glm::mat4 toPivot = glm::translate(glm::mat4(), -entity.getRotationPivot());
 	glm::mat4 translation = glm::translate(glm::mat4(), entity.position);
 	glm::mat4 scale = glm::scale(glm::mat4(), entity.scale);
 	glm::quat quaternion = directionToQuaternion(entity.forward, entity.up, DEFAULT_FORWARD, DEFAULT_UP);
 	glm::mat4 rotation = glm::toMat4(quaternion);
-	glm::mat4 transformation = translation * rotation * scale;
+	glm::mat4 transformation = translation * glm::inverse(toPivot) * rotation * toPivot * scale;
+	if (entity.getParentEntity()) {
+		return getEntityTransformation(*entity.getParentEntity()) * transformation;
+	} else {
+		return transformation;
+	}
+}
+
+void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+	glm::mat4 transformation = getEntityTransformation(entity);
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
-	glBindVertexArray(entity.vao);
+	glBindVertexArray(entity.getModel().vao);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, entity.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
-	glDrawElements(GL_TRIANGLES, entity.numIndices, GL_UNSIGNED_INT, (void*)0);
+	glDrawElements(GL_TRIANGLES, entity.getModel().numIndices, GL_UNSIGNED_INT, (void*)(entity.getModel().offset * sizeof(GLuint)));
 }
 
 void renderTerrain(Terrain &terrain, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
@@ -84,12 +94,12 @@ void renderSkybox(Entity &skybox, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
-	glBindVertexArray(skybox.vao);
+	glBindVertexArray(skybox.getModel().vao);
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "isSkybox"), 1);
 	glUniform1i(glGetUniformLocation(shaderProgram, "cubeMap"), 10);
-	glDrawElements(GL_TRIANGLES, skybox.numIndices, GL_UNSIGNED_INT, (void*)0);
+	glDrawElements(GL_TRIANGLES, skybox.getModel().numIndices, GL_UNSIGNED_INT, (void*)0);
 	glUniform1i(glGetUniformLocation(shaderProgram, "isSkybox"), 0);
 	glEnable(GL_DEPTH_TEST);
 }
@@ -139,10 +149,10 @@ GLuint loadPNGTexture(std::string filename) {
 	GLuint texId;
 	glGenTextures(1, &texId);
 	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, texId);
 	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texId);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	return texId;
@@ -299,14 +309,14 @@ GLuint getShader() {
 	return program;
 }
 
-glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
+glm::vec3 cameraPosition = glm::vec3(10, 100, 10);
 glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump;
 
 void basicSteering(glm::vec3 &position, glm::vec3 &forward, glm::vec3 &up) {
 	GLfloat rotationSpeed = 0.03f;
-	GLfloat speed = 0.25f * 50;
+	GLfloat speed = 0.25f * .09f;
 	if (isForward)
 	{
 		position = position + forward * speed;
@@ -353,10 +363,6 @@ void printVector(glm::vec3 &v) {
 	std::cout << v.x << ", " << v.y << ", " << v.z << std::endl;
 }
 
-void rotateEntity(Entity &entity, glm::vec3 axis, float amount) {
-	entity.up = glm::normalize( glm::rotate(entity.up, amount, axis) );
-	entity.forward = glm::normalize( glm::rotate(entity.forward, amount, axis) );
-}
 
 void handleKeyChange(bool* currentValue, int action) {
 	if (action == GLFW_PRESS) {
@@ -369,7 +375,7 @@ void handleKeyChange(bool* currentValue, int action) {
 void interpolateCamera(glm::vec3 &targetPosition, glm::vec3 &cameraPosition) {
 	float dt = 0.01f;
 	glm::vec3 direction = glm::normalize(targetPosition - cameraPosition);
-	cameraPosition = cameraPosition + direction * dt * glm::length(targetPosition - cameraPosition) / 1.0f * 8.0f;
+	cameraPosition = cameraPosition + direction * dt * glm::length(targetPosition - cameraPosition) / 1.0f * 18.0f;
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -427,7 +433,7 @@ void makeRunwayOnHeightmap(float *heightmap, int size) {
 int main() {
 	const int windowHeight = 900;
 	const int windowWidth = 1700;
-	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, windowWidth / (float)windowHeight, .1f, 100000);
+	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, windowWidth / (float)windowHeight, .1f, 1000);
 
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit()) {
@@ -460,8 +466,7 @@ int main() {
 	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 100);
 
 	Terrain ground = Terrain();
-	ground.vao = terrain.vao;
-	ground.numIndices = terrain.numIndices;
+	ground.setModel(terrain);
 	ground.position = glm::vec3(0, 0, 0);
 	ground.scale = glm::vec3(1, 1, 1);
 	ground.textureId = loadPNGTexture("Resources/grass512.png");
@@ -469,18 +474,19 @@ int main() {
 	ground.setTextureId3(loadPNGTexture("Resources/rock512.png"));
 	ground.setTextureId4(loadPNGTexture("Resources/terrain-splatmap.png"));
 
-	Model m = tinyObjLoader("Resources/jas.obj");
-	Entity plane = Entity();
-	plane.vao = m.vao;
-	plane.textureId = loadPNGTexture("Resources/jas.png");
-	plane.numIndices = m.numIndices;
-	plane.position = glm::vec3((size * tileSizeXZ)/(float)2, 112, (size * tileSizeXZ) / (float)2);
-	plane.scale = glm::vec3(0.5f, 0.5f, 0.5f);
-	plane.centerToGroundContactPoint = -1;
+	GLuint jasTexture = loadPNGTexture("Resources/jas.png");
+	std::vector<Entity*> airplane = loadJAS39Gripen("Resources/jas.obj");
+	airplane[0]->position = glm::vec3(10, 100, 10);
+	airplane[0]->scale = glm::vec3(0.2f, 0.2f, 0.2f);
+	for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
+		(*iter)->textureId = jasTexture;
+	}
 
 	Entity skybox = Entity();
-	skybox.vao = getVAOBox();
-	skybox.numIndices = 6 * 6;
+	Model box = Model();
+	box.vao = getVAOBox();
+	box.numIndices = 36;
+	skybox.setModel(box);
 	skybox.scale = glm::vec3(20, 20, 20);
 	skybox.position = glm::vec3(0, -10, 0);
 	skybox.textureId = createSkybox();
@@ -501,26 +507,33 @@ int main() {
 		lastTime = currentTime;
 		basicSteering(cameraPosition, cameraForward, cameraUp);
 
-		airplanePhysics(plane.position, plane.forward, plane.up, plane.velocity, isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
-		terrainCollision(heightmapData, size, tileSizeXZ, plane);
+		steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		//airplanePhysics(*airplane[0], airplane[0]->position, airplane[0]->forward, airplane[0]->up, airplane[0]->velocity, isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		//terrainCollision(heightmapData, size, tileSizeXZ, plane);
 
 		// Normal camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
 
-		//glm::vec3 targetposition = plane.position + -plane.forward * 7.5f + plane.up * 3.0f;
-		//interpolatecamera(targetposition, cameraposition);
-		//cam = glm::lookat(cameraposition, plane.position, plane.up);
+		glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f + airplane[0]->up * 1.0f;
+		interpolateCamera(targetPosition, cameraPosition);
+		cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
 
 		// Render entities
 		renderSkybox(skybox, shaderProgram, cam, perspective);
 		renderTerrain(ground, shaderProgram, cam, perspective);
-		renderEntity(plane, shaderProgram, cam, perspective);
+		for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
+			renderEntity(**iter, shaderProgram, cam, perspective);
+		}
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
 	delete heightmapData;
+	
+	for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
+		delete *iter;
+	}
 
 	return 0;
 }

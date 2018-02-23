@@ -8,20 +8,25 @@
 #include <vector>
 #include <string>
 
+#include <glm/gtx/transform.hpp> 
+#include <glm/gtx/rotate_vector.hpp> 
+
 #include <memory>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
 Entity::Entity() {
-	std::cout << "Körs konstruktor" << std::endl;
 	position = glm::vec3(0, 0, 0);
 	scale = glm::vec3(1, 1, 1);
 	velocity = glm::vec3(0, 0, 0);
 	centerToGroundContactPoint = 0;
 	impulse = glm::vec3(0, 0, 0);
+	rotationPivot = glm::vec3(0, 0, 0);
 	forward = DEFAULT_FORWARD;
 	up = DEFAULT_UP;
+	parentEntity = nullptr;
+	name = "";
 };
 
 std::string readFile(std::string path) {
@@ -130,13 +135,13 @@ Model modelFromVertexData(float vertexCoordinates[], int vertexCoordinatesSize, 
 	return m;
 }
 
-Model tinyObjLoader(std::string fileName) {
+Model tinyObjLoader(std::string filename) {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
 
 	std::string err;
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, fileName.c_str());
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filename.c_str());
 
 	if (!err.empty()) {
 		std::cerr << err << std::endl;
@@ -150,7 +155,6 @@ Model tinyObjLoader(std::string fileName) {
 	// Loop over shapes
 	int i = 0;
 	for (size_t s = 0; s < shapes.size(); s++) {
-		std::cout << shapes[s].name << std::endl;
 
 		// Loop over faces (polygon)
 		size_t index_offset = 0;
@@ -186,6 +190,96 @@ Model tinyObjLoader(std::string fileName) {
 	return modelFromVertexData(vertexData, vertices.size(), normalData, normals.size(), textureData, textures.size(), indexData, indices.size());
 }
 
-Entity *loadJAS39Gripen(std::string filename) {
-	return nullptr;
+std::vector<Entity*> loadJAS39Gripen(std::string filename) {
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string err;
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filename.c_str());
+
+	if (!err.empty()) {
+		std::cerr << err << std::endl;
+	}
+
+	std::vector<float> vertices;
+	std::vector<float> normals;
+	std::vector<float> textures;
+	std::vector<int> indices;
+
+	std::vector<Entity*> entities;
+
+	// Loop over shapes
+	int i = 0;
+	for (size_t s = 0; s < shapes.size(); s++) {
+		std::cout << shapes[s].name << std::endl;
+
+		Entity *entity = new Entity();
+		entity->setName(shapes[s].name);
+		Model m = Model();
+		m.offset = i;
+
+		if (shapes[s].name == "AileronL01") {
+			entity->setRotationPivot(glm::vec3(3.265f, -0.16f, -3.58));
+		}
+		if (shapes[s].name == "AileronR01") {
+			entity->setRotationPivot(glm::vec3(-3.265f, -0.16f, -3.58));
+		}
+		if (shapes[s].name == "FlapL01") {
+			entity->setRotationPivot(glm::vec3(2.265f, -0.16f, -3.58));
+		}
+		if (shapes[s].name == "FlapR01") {
+			entity->setRotationPivot(glm::vec3(-2.265f, -0.16f, -3.58));
+		}
+		
+		// Loop over faces (polygon)
+		size_t index_offset = 0;
+		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+			int fv = shapes[s].mesh.num_face_vertices[f];
+
+			// Loop over vertices in the face.
+			for (size_t v = 0; v < fv; v++) {
+				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+				vertices.push_back(attrib.vertices[3 * idx.vertex_index + 0]);
+				vertices.push_back(attrib.vertices[3 * idx.vertex_index + 1]);
+				vertices.push_back(attrib.vertices[3 * idx.vertex_index + 2]);
+				normals.push_back(attrib.normals[3 * idx.normal_index + 0]);
+				normals.push_back(attrib.normals[3 * idx.normal_index + 1]);
+				normals.push_back(attrib.normals[3 * idx.normal_index + 2]);
+				textures.push_back(attrib.texcoords[2 * idx.texcoord_index + 0]);
+				textures.push_back(attrib.texcoords[2 * idx.texcoord_index + 1]);
+
+				indices.push_back(i);
+				i++;
+			}
+			index_offset += fv;
+
+			// per-face material
+			shapes[s].mesh.material_ids[f];
+		}
+	
+		m.numIndices = i - m.offset;
+		entity->setModel(m);
+		entities.push_back(entity);
+	}
+
+	float *vertexData = &vertices[0];
+	float *normalData = &normals[0];
+	float *textureData = &textures[0];
+	int *indexData = &indices[0];
+
+	Model completeModel = modelFromVertexData(vertexData, vertices.size(), normalData, normals.size(), textureData, textures.size(), indexData, indices.size());
+	
+	for (std::vector<Entity*>::iterator iter = entities.begin(); iter != entities.end(); iter++) {
+		(*iter)->getModel().vao = completeModel.vao;
+		if (iter != entities.begin()) {
+			(*iter)->setParentEntity(entities[0]);
+		}
+	}
+
+	return std::move(entities);
+}
+
+void rotateEntity(Entity &entity, glm::vec3 axis, float amount) {
+	entity.up = glm::normalize(glm::rotate(entity.up, amount, axis));
+	entity.forward = glm::normalize(glm::rotate(entity.forward, amount, axis));
 }
