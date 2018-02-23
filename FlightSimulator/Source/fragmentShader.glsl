@@ -33,16 +33,16 @@ void main() {
 	// Directional light
 	vec3 lightDir = normalize(vec3(1, -2, 1));
 	vec3 fragToLight = -lightDir;
-	float diffuse = dot(fragToLight, normalize(normal_out)) * 1.5;
-	if (diffuse < 0.3) {
-		diffuse = 0.3;
+	float diffuse = dot(fragToLight, normalize(normal_out)) * 1.4;
+	if (diffuse < 0.2) {
+		diffuse = 0.2;
 	}
 
 	if (isTerrain) {
 		vec4 terrain1 = texture(tex, texture_out);
 		vec4 terrain2 = texture(tex2, texture_out);
 		vec4 terrain3 = texture(tex3, texture_out);
-		vec4 splat = texture(tex4, texture_out / 100);
+		vec4 splat = texture(tex4, texture_out / 2800);
 		gl_Color = (splat.x * terrain1 + splat.y * terrain2 + splat.z * terrain3) * diffuse;
 	}
 
@@ -60,9 +60,9 @@ void main() {
 
 	// Fade far away objects
 	float camDistance = length(cameraPos - fragment_out);
-	float distanceStartFade = 10000;
-	float distanceEndFade = 60000;
-	if (camDistance > distanceStartFade) {
+	float distanceStartFade = 100;
+	float distanceEndFade = 1000;
+	if (camDistance > distanceStartFade && !isSkybox) {
 		float saturation = clamp((camDistance - distanceStartFade) / (distanceEndFade - distanceStartFade), 0, 1);
 		gl_Color = vec4(saturate(gl_Color.xyz, 1 - saturation), 1);
 		gl_Color = mix(gl_Color, vec4(0.27, 0.43, 0.66, 1), saturation);
