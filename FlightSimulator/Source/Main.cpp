@@ -430,6 +430,101 @@ void makeRunwayOnHeightmap(float *heightmap, int size) {
 	}
 }
 
+void log(std::string output) {
+	std::cout << output << std::endl;
+}
+
+void glDebugMessageCallbackFunction(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam) {
+	if (type == GL_DEBUG_TYPE_MARKER) {
+		return;
+	}
+
+	switch (source) {
+	case GL_DEBUG_SOURCE_API:
+		log("Source: GL_DEBUG_SOURCE_API");
+		break;
+
+	case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
+		log("Source: GL_DEBUG_SOURCE_WINDOW_SYSTEM");
+		break;
+
+	case GL_DEBUG_SOURCE_SHADER_COMPILER:
+		log("Source: GL_DEBUG_SOURCE_SHADER_COMPILER");
+		break;
+
+	case GL_DEBUG_SOURCE_THIRD_PARTY:
+		log("Source: GL_DEBUG_SOURCE_THIRD_PARTY");
+		break;
+
+	case GL_DEBUG_SOURCE_APPLICATION:
+		log("Source: GL_DEBUG_SOURCE_APPLICATION");
+		break;
+
+	case GL_DEBUG_SOURCE_OTHER:
+		log("Source: GL_DEBUG_SOURCE_OTHER");
+		break;
+	}
+
+	switch (type) {
+	case GL_DEBUG_TYPE_ERROR:
+		log("Type: GL_DEBUG_TYPE_ERROR");
+		break;
+
+	case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+		log("Type: GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR");
+		break;
+
+	case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+		log("Type: GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR");
+		break;
+
+	case GL_DEBUG_TYPE_PORTABILITY:
+		log("Type: GL_DEBUG_TYPE_PORTABILITY");
+		break;
+
+	case GL_DEBUG_TYPE_PERFORMANCE:
+		log("Type: GL_DEBUG_TYPE_PERFORMANCE");
+		break;
+
+	case GL_DEBUG_TYPE_MARKER:
+		log("Type: GL_DEBUG_TYPE_MARKER");
+		break;
+
+	case GL_DEBUG_TYPE_PUSH_GROUP:
+		log("Type: GL_DEBUG_TYPE_PUSH_GROUP");
+		break;
+
+	case GL_DEBUG_TYPE_POP_GROUP:
+		log("Type: GL_DEBUG_TYPE_POP_GROUP");
+		break;
+
+	case GL_DEBUG_TYPE_OTHER:
+		log("Type: GL_DEBUG_TYPE_OTHER");
+		break;
+	}
+
+	switch (severity) {
+	case GL_DEBUG_SEVERITY_HIGH:
+		log("Severity: GL_DEBUG_SEVERITY_HIGH");
+		break;
+
+	case GL_DEBUG_SEVERITY_MEDIUM:
+		log("Severity: GL_DEBUG_SEVERITY_MEDIUM");
+		break;
+
+	case GL_DEBUG_SEVERITY_LOW:
+		log("Severity: GL_DEBUG_SEVERITY_LOW");
+		break;
+
+	case GL_DEBUG_SEVERITY_NOTIFICATION:
+		log("Severity: GL_DEBUG_SEVERITY_NOTIFICATION");
+		break;
+	}
+
+	log(id);
+	log(message);
+}
+
 int main() {
 	const int windowHeight = 900;
 	const int windowWidth = 1700;
@@ -453,17 +548,31 @@ int main() {
 		std::cerr << "Error! Failed to initlize OpenGL" << std::endl;
 	}
 
+	GLuint ids[] = { 0x20071 };
+	glEnable(GL_DEBUG_OUTPUT);
+	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+	glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_OTHER, GL_DONT_CARE, 1, ids, GL_FALSE);
+	glDebugMessageCallback(glDebugMessageCallbackFunction, 0);
+
 	GLuint shaderProgram = getShader();
 	glUseProgram(shaderProgram);
 
-	const int size = 2049;
-	const int tileSizeXZ = 32;
+	const int size = 129;
+	const int tileSizeXZ = 40;
 	const int tileSizeY = 1;
 	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
 	float *heightmapData = new float[size * size];
-	diamondSquare(heightmapData, size, 0.03f, seed);
+	diamondSquare(heightmapData, size, 0.3f, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
-	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 100);
+	const int numSubdivisions = 2;
+
+	Entity *terrainEntities[numSubdivisions * numSubdivisions];
+	for (int x = 0; x < numSubdivisions; x++) {
+		for (int z = 0; z < numSubdivisions; z++) {
+		}
+	}
+
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 2800);
 
 	Terrain ground = Terrain();
 	ground.setModel(terrain);
