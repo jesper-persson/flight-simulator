@@ -174,7 +174,6 @@ GLuint createSkybox() {
 	return texId;
 }
 
-
 GLuint getShader(std::string vertexShaderPath, std::string fragmentShaderPath) {
 	std::string vertexSource = readFile(vertexShaderPath);
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -225,11 +224,11 @@ GLuint getShader(std::string vertexShaderPath, std::string fragmentShaderPath) {
 glm::vec3 cameraPosition = glm::vec3(10, 10, 10);
 glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump;
+bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump, isShift;
 
 void basicSteering(glm::vec3 &position, glm::vec3 &forward, glm::vec3 &up) {
 	GLfloat rotationSpeed = 0.03f;
-	GLfloat speed = 0.25f * 10.09f;
+	GLfloat speed = 0.09f * (isShift ? 10 : 1);
 	if (isForward)
 	{
 		position = position + forward * speed;
@@ -292,6 +291,10 @@ void interpolateCamera(glm::vec3 &targetPosition, glm::vec3 &cameraPosition) {
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (key == GLFW_KEY_LEFT_SHIFT) {
+		handleKeyChange(&isShift, action);
+	}
+	
 	if (key == GLFW_KEY_W) {
 		handleKeyChange(&isForward, action);
 	}
