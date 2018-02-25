@@ -1,6 +1,6 @@
 # Blender v2.79 (sub 0) OBJ File: ''
 # www.blender.org
-mtllib jas2.mtl
+mtllib Resources/gripen-saab.mtl
 o Glass
 v -0.382320 0.425323 4.337699
 v -0.393900 0.456542 4.178199

@@ -132,8 +132,12 @@
     <ClInclude Include="Source\Physics.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Source\fragmentShader.glsl" />
-    <None Include="Source\vertexShader.glsl" />
+    <None Include="Source\modelFS.glsl" />
+    <None Include="Source\skyboxFS.glsl" />
+    <None Include="Source\skyboxVS.glsl" />
+    <None Include="Source\modelVS.glsl" />
+    <None Include="Source\terrainFS.glsl" />
+    <None Include="Source\terrainVS.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

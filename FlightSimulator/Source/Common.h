@@ -13,11 +13,28 @@ const glm::vec3 DEFAULT_UP = glm::vec3(0, 1, 0);
 struct Model {
 public:
 	Model() : offset(0) {
-
+		offset = 0;
+		Ns = 0;
+		Ni = 1;
+		d = 1;
+		illum = 0;
+		map_Kd = -1;
+		Ka = glm::vec3(0, 0, 0);
+		Kd = glm::vec3(0, 0, 0);
+		Ks = glm::vec3(0, 0, 0);
 	}
 	GLuint vao;
 	int offset;
 	int numIndices;
+	float Ns; // Specular expondent
+	float Ni; // Optical density
+	float d; // Transparencey (0 to 1)
+	int illum; // Illumination model
+	// Pointer so that we can indicate no value for missing map_Kd:s
+	GLuint map_Kd;
+	glm::vec3 Ka; // Ambient reflectivity
+	glm::vec3 Kd; // Diffuse reflectivity
+	glm::vec3 Ks; // Specular reflectivity
 };
 
 class Entity {
@@ -104,5 +121,7 @@ void rotateEntity(Entity &entity, glm::vec3 axis, float amount);
 Model getVAOCube();
 
 void calculateTangents(float *vertexData, float *textureData, int numVertices, float *tangentData, float *bitangentData);
+
+GLuint loadPNGTexture(std::string filename);
 
 #endif

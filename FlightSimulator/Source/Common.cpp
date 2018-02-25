@@ -11,6 +11,8 @@
 #include <glm/gtx/transform.hpp> 
 #include <glm/gtx/rotate_vector.hpp> 
 
+#include <lodepng.h>
+
 #include <memory>
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -208,6 +210,8 @@ std::vector<Entity*> loadJAS39Gripen(std::string filename) {
 
 	std::vector<Entity*> entities;
 
+	GLuint textureId = loadPNGTexture("Resources/jas.png");
+
 	// Loop over shapes
 	int i = 0;
 	for (size_t s = 0; s < shapes.size(); s++) {
@@ -230,6 +234,18 @@ std::vector<Entity*> loadJAS39Gripen(std::string filename) {
 		if (shapes[s].name == "FlapR01") {
 			entity->setRotationPivot(glm::vec3(-2.265f, -0.16f, -3.58));
 		}
+
+		// Add materials
+		tinyobj::material_t material = materials[shapes[s].mesh.material_ids[0]];
+		if (material.diffuse_texname != "") {
+			m.map_Kd = textureId;
+		}
+		m.illum = material.illum;
+		m.Ns = material.shininess;
+		m.d = material.dissolve;
+		m.Ka = glm::vec3(material.ambient[0], material.ambient[1], material.ambient[2]);
+		m.Kd = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+		m.Ks = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
 		
 		// Loop over faces (polygon)
 		size_t index_offset = 0;
@@ -485,4 +501,27 @@ void calculateTangents(float *vertexData, float *textureData, int numVertices, f
 		bitangentData[i + 7] = bitangent.y;
 		bitangentData[i + 8] = bitangent.z;
 	}
+}
+
+GLuint loadPNGTexture(std::string filename) {
+	const char* filenameC = (const char*)filename.c_str();
+	std::vector<unsigned char> image;
+	unsigned width, height;
+	unsigned error = lodepng::decode(image, width, height, filename);
+
+	std::vector<unsigned char> imageCopy(width * height * 4);
+	for (unsigned i = 0; i < height; i++) {
+		memcpy(&imageCopy[(height - i - 1) * width * 4], &image[i * width * 4], width * 4);
+	}
+
+	GLuint texId;
+	glGenTextures(1, &texId);
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texId);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	return texId;
 }

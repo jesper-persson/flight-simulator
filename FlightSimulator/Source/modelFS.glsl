@@ -10,6 +10,10 @@ uniform bool isTerrain;
 uniform bool isSkybox;
 uniform mat4 worldToView;
 
+uniform vec3 Ka, Kd, Ks;
+uniform float specularExponent;
+uniform float dissolve;
+
 in vec3 fragmentPositionTangentSpaceVS;
 in vec3 viewPositionTangentSpaceVS;
 in vec3 lightDirectionTangentSpaceVS;
@@ -28,16 +32,16 @@ vec3 saturate(vec3 color, float saturate) {
 }
 
 void main() {
-	vec4 ambient = vec4(0.3, 0.3, 0.3, 1);
+	vec4 ambient = vec4(0.3,0.3,0.3,1);
 
 	vec3 normal = normalize(normalVS);
-	float normalMapScale = 10;
+	float normalMapScale = 40;
 	vec3 normalTangentSpace = normalize(vec3(texture(normalMap, textureVS * normalMapScale).xyz) * 2 - 1); 
 	vec3 lightDirection = lightDirectionVS;
 	vec3 fragment = fragmentVS;
 	vec3 viewPosition = viewPositionVS;
 
-	bool useNormalMap = !isTerrain && !isSkybox;
+	bool useNormalMap = !isTerrain && !isSkybox && false;
 	if (useNormalMap) {
 		normal = normalTangentSpace;
 		lightDirection = lightDirectionTangentSpaceVS;
@@ -48,15 +52,15 @@ void main() {
 	// Directional light
 	vec3 fragToLight = -lightDirection;
 	float diffuse = dot(fragToLight, normal) * 1.5;
-	vec4 diffuseColor = vec4(1, 1, 1, 1);
+	vec4 diffuseColor = vec4(Kd, 1);
 	
 
 	// Specular highlight
 	vec3 reflectionDirection = reflect(lightDirection, normalize(normal));
 	vec3 surfaceToCamera = normalize(viewPosition - fragment);
 	float cosAngle = max(0.0, dot(surfaceToCamera, reflectionDirection));
-	float specularCoefficient = pow(cosAngle, 50);
-	vec4 specularColor = vec4(1, 1, 1, 1);
+	float specularCoefficient = pow(cosAngle, specularExponent);
+	vec4 specularColor = vec4(Ks.xyz, 1);
 
 	//  Fix issue where specular shines through object (not really)
 	if (dot(normal, lightDirection) >= 0) {
@@ -88,7 +92,6 @@ void main() {
 	//	gl_Color = vec4(saturate(gl_Color.xyz, 1 - saturation), 1);
 	//	gl_Color = mix(gl_Color, vec4(0.27, 0.43, 0.66, 1), saturation);
 	}
-
 	
-	gl_Color.w = 1;
+	gl_Color.w = dissolve;
 }

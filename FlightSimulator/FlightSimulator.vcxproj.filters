@@ -43,7 +43,11 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Source\fragmentShader.glsl" />
-    <None Include="Source\vertexShader.glsl" />
+    <None Include="Source\skyboxVS.glsl" />
+    <None Include="Source\skyboxFS.glsl" />
+    <None Include="Source\modelFS.glsl" />
+    <None Include="Source\modelVS.glsl" />
+    <None Include="Source\terrainVS.glsl" />
+    <None Include="Source\terrainFS.glsl" />
   </ItemGroup>
 </Project>

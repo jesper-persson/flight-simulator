@@ -60,10 +60,18 @@ glm::mat4 getEntityTransformation(Entity &entity) {
 }
 
 void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+	glUseProgram(shaderProgram);
 	glm::mat4 transformation = getEntityTransformation(entity);
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
+
+	glUniform3f(glGetUniformLocation(shaderProgram, "Ka"), entity.getModel().Ka.x, entity.getModel().Ka.y, entity.getModel().Ka.z);
+	glUniform3f(glGetUniformLocation(shaderProgram, "Kd"), entity.getModel().Kd.x, entity.getModel().Kd.y, entity.getModel().Kd.z);
+	glUniform3f(glGetUniformLocation(shaderProgram, "Ks"), entity.getModel().Ks.x, entity.getModel().Ks.y, entity.getModel().Ks.z);
+	glUniform1f(glGetUniformLocation(shaderProgram, "specularExponent"), entity.getModel().Ns);
+	glUniform1f(glGetUniformLocation(shaderProgram, "dissolve"), entity.getModel().d);
+
 	glBindVertexArray(entity.getModel().vao);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, entity.textureId);
@@ -75,6 +83,7 @@ void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, 
 }
 
 void renderTerrain(Terrain &terrain, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+	glUseProgram(shaderProgram);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, terrain.getTextureId2());
 	glActiveTexture(GL_TEXTURE2);
@@ -84,13 +93,12 @@ void renderTerrain(Terrain &terrain, GLuint shaderProgram, glm::mat4 &worldToVie
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex2"), 1);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex3"), 2);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex4"), 3);
-	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 1);
 	renderEntity(terrain, shaderProgram, worldToView, perspective);
-	glUniform1i(glGetUniformLocation(shaderProgram, "isTerrain"), 0);
 }
 
 void renderSkybox(Entity &skybox, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
 	glDisable(GL_DEPTH_TEST);
+	glUseProgram(shaderProgram);
 	glm::mat4 translation = glm::translate(glm::mat4(), skybox.position);
 	glm::mat4 scale = glm::scale(glm::mat4(), skybox.scale);
 	glm::mat4 transformation = translation * scale;
@@ -100,10 +108,8 @@ void renderSkybox(Entity &skybox, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glBindVertexArray(skybox.getModel().vao);
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.textureId);
-	glUniform1i(glGetUniformLocation(shaderProgram, "isSkybox"), 1);
 	glUniform1i(glGetUniformLocation(shaderProgram, "cubeMap"), 10);
 	glDrawElements(GL_TRIANGLES, skybox.getModel().numIndices, GL_UNSIGNED_INT, (void*)0);
-	glUniform1i(glGetUniformLocation(shaderProgram, "isSkybox"), 0);
 	glEnable(GL_DEPTH_TEST);
 }
 
@@ -138,29 +144,6 @@ std::vector<unsigned char> loadPNG(std::string filename) {
 	return image;
 }
 
-GLuint loadPNGTexture(std::string filename) {
-	const char* filenameC = (const char*)filename.c_str();
-	std::vector<unsigned char> image;
-	unsigned width, height;
-	unsigned error = lodepng::decode(image, width, height, filename);
-
-	std::vector<unsigned char> imageCopy(width * height * 4);
-	for (unsigned i = 0; i < height; i++) {
-		memcpy(&imageCopy[(height - i - 1) * width * 4], &image[i * width * 4], width * 4);
-	}
-
-	GLuint texId;
-	glGenTextures(1, &texId);
-	glEnable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texId);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	return texId;
-}
-
 GLuint createSkybox() {
 	GLuint texId;
 	glGenTextures(1, &texId);
@@ -192,8 +175,8 @@ GLuint createSkybox() {
 }
 
 
-GLuint getShader() {
-	std::string vertexSource = readFile("Source\\vertexShader.glsl");
+GLuint getShader(std::string vertexShaderPath, std::string fragmentShaderPath) {
+	std::string vertexSource = readFile(vertexShaderPath);
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 	const GLchar* vertexSourceC = (const GLchar *)vertexSource.c_str();
 	glShaderSource(vertexShader, 1, &vertexSourceC, 0);
@@ -212,7 +195,7 @@ GLuint getShader() {
 		std::cout << str << std::endl;
 	}
 
-	std::string fragmentSource = readFile("Source\\fragmentShader.glsl");
+	std::string fragmentSource = readFile(fragmentShaderPath);
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 	const GLchar* fragmentSourceC = (const GLchar *)fragmentSource.c_str();
 	glShaderSource(fragmentShader, 1, &fragmentSourceC, 0);
@@ -239,14 +222,14 @@ GLuint getShader() {
 	return program;
 }
 
-glm::vec3 cameraPosition = glm::vec3(10, 100, 10);
+glm::vec3 cameraPosition = glm::vec3(10, 10, 10);
 glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump;
 
 void basicSteering(glm::vec3 &position, glm::vec3 &forward, glm::vec3 &up) {
 	GLfloat rotationSpeed = 0.03f;
-	GLfloat speed = 0.25f * .09f;
+	GLfloat speed = 0.25f * 10.09f;
 	if (isForward)
 	{
 		position = position + forward * speed;
@@ -484,8 +467,9 @@ int main() {
 	glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_OTHER, GL_DONT_CARE, 1, ids, GL_FALSE);
 	glDebugMessageCallback(glDebugMessageCallbackFunction, 0);
 
-	GLuint shaderProgram = getShader();
-	glUseProgram(shaderProgram);
+	GLuint modelShader = getShader("Source/modelVS.glsl", "Source/modelFS.glsl");
+	GLuint skyboxShader = getShader("Source/skyboxVS.glsl", "Source/skyboxFS.glsl");
+	GLuint terrainShader = getShader("Source/terrainVS.glsl", "Source/terrainFS.glsl");
 
 	const int size = 129;
 	const int tileSizeXZ = 1;
@@ -502,13 +486,13 @@ int main() {
 		}
 	}
 
-	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 2800);
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 40);
 
 	Terrain ground = Terrain();
 	ground.setModel(terrain);
 	ground.position = glm::vec3(0, 0, 0);
 	ground.scale = glm::vec3(1, 1, 1);
-	//ground.textureId = loadPNGTexture("Resources/grass512.png");
+	ground.textureId = loadPNGTexture("Resources/grass512.png");
 	ground.setTextureId2(loadPNGTexture("Resources/sand512.png"));
 	ground.setTextureId3(loadPNGTexture("Resources/rock512.png"));
 	ground.setTextureId4(loadPNGTexture("Resources/terrain-splatmap.png"));
@@ -537,7 +521,7 @@ int main() {
 	cube.textureId = loadPNGTexture("Resources/grass512.png");
 	cube.normalMapId = loadPNGTexture("Resources/normalmap.png");
 
-	glClearColor(0.27, 0.43, 0.66, 0.0f);
+	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -567,12 +551,17 @@ int main() {
 		//cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
 
 		// Render entities
-		renderSkybox(skybox, shaderProgram, cam, perspective);
-		renderTerrain(ground, shaderProgram, cam, perspective);
-		for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
-			renderEntity(**iter, shaderProgram, cam, perspective);
+		renderSkybox(skybox, skyboxShader, cam, perspective);
+		renderTerrain(ground, terrainShader, cam, perspective);
+		for (int i = 0; i < airplane.size(); i++) {
+			if (i == 8 || i == 0) {
+				continue;
+			}
+			renderEntity(*airplane[i], modelShader, cam, perspective);
 		}
-		renderEntity(cube, shaderProgram, cam, perspective);
+		renderEntity(*airplane[0], modelShader, cam, perspective);
+		renderEntity(*airplane[8], modelShader, cam, perspective);
+		renderEntity(cube, modelShader, cam, perspective);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
