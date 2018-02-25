@@ -31,6 +31,7 @@ public:
 	float centerToGroundContactPoint; // For terrain collision
 	glm::vec3 impulse;
 	GLuint textureId;
+	GLuint normalMapId;
 	Model& getModel() {
 		return model;
 	}
@@ -99,5 +100,9 @@ Model tinyObjLoader(std::string fileName);
 std::vector<Entity*> loadJAS39Gripen(std::string filename);
 
 void rotateEntity(Entity &entity, glm::vec3 axis, float amount);
+
+Model getVAOCube();
+
+void calculateTangents(float *vertexData, float *textureData, int numVertices, float *tangentData, float *bitangentData);
 
 #endif

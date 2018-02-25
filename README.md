@@ -5,10 +5,10 @@ This is a flight simulator written in C++ with OpenGL. I created this projected 
 - Terrain generation with diamond-square algorithm
 - Splat maps
 - Diffuse lighting
+- Normal mapping
 
 ## To add
 - Shadows using depth buffer
-- Normal maps
 - Displacement maps
 - Post processing shader
 - Particle system

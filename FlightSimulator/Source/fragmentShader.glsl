@@ -4,14 +4,20 @@ uniform sampler2D tex;
 uniform sampler2D tex2;
 uniform sampler2D tex3;
 uniform sampler2D tex4;
+uniform sampler2D normalMap;
 uniform samplerCube cubeMap;
 uniform bool isTerrain;
 uniform bool isSkybox;
 uniform mat4 worldToView;
 
-in vec2 texture_out;
-smooth in vec3 normal_out;
-smooth in vec3 fragment_out;
+in vec3 fragmentPositionTangentSpaceVS;
+in vec3 viewPositionTangentSpaceVS;
+in vec3 lightDirectionTangentSpaceVS;
+in vec3 lightDirectionVS;
+in vec3 viewPositionVS;
+in vec2 textureVS;
+in vec3 normalVS;
+in vec3 fragmentVS;
 
 out vec4 gl_Color;
 
@@ -22,51 +28,67 @@ vec3 saturate(vec3 color, float saturate) {
 }
 
 void main() {
-	// Spotlight
-	/*vec3 lightPos = vec3(5, 6, 5);
-	vec3 fragToLight = normalize(lightPos - fragment_out);
-	float diffuse = dot(fragToLight, normalize(normal_out));
-	if (diffuse < 0.2) {
-	 diffuse = 0.2;
-	}*/
+	vec4 ambient = vec4(0.3, 0.3, 0.3, 1);
+
+	vec3 normal = normalize(normalVS);
+	float normalMapScale = 10;
+	vec3 normalTangentSpace = normalize(vec3(texture(normalMap, textureVS * normalMapScale).xyz) * 2 - 1); 
+	vec3 lightDirection = lightDirectionVS;
+	vec3 fragment = fragmentVS;
+	vec3 viewPosition = viewPositionVS;
+
+	bool useNormalMap = !isTerrain && !isSkybox;
+	if (useNormalMap) {
+		normal = normalTangentSpace;
+		lightDirection = lightDirectionTangentSpaceVS;
+		viewPosition = viewPositionTangentSpaceVS;
+		fragment = fragmentPositionTangentSpaceVS;
+	}
 
 	// Directional light
-	vec3 lightDir = normalize(vec3(1, -2, 1));
-	vec3 fragToLight = -lightDir;
-	float diffuse = dot(fragToLight, normalize(normal_out)) * 1.4;
-	if (diffuse < 0.2) {
-		diffuse = 0.2;
+	vec3 fragToLight = -lightDirection;
+	float diffuse = dot(fragToLight, normal) * 1.5;
+	vec4 diffuseColor = vec4(1, 1, 1, 1);
+	
+
+	// Specular highlight
+	vec3 reflectionDirection = reflect(lightDirection, normalize(normal));
+	vec3 surfaceToCamera = normalize(viewPosition - fragment);
+	float cosAngle = max(0.0, dot(surfaceToCamera, reflectionDirection));
+	float specularCoefficient = pow(cosAngle, 50);
+	vec4 specularColor = vec4(1, 1, 1, 1);
+
+	//  Fix issue where specular shines through object (not really)
+	if (dot(normal, lightDirection) >= 0) {
+		specularCoefficient = 0;
 	}
 
 	if (isTerrain) {
-		vec4 terrain1 = texture(tex, texture_out);
-		vec4 terrain2 = texture(tex2, texture_out);
-		vec4 terrain3 = texture(tex3, texture_out);
-		vec4 splat = texture(tex4, texture_out / 2800);
-		gl_Color = (splat.x * terrain1 + splat.y * terrain2 + splat.z * terrain3) * diffuse;
+		vec4 terrain1 = texture(tex, textureVS);
+		vec4 terrain2 = texture(tex2, textureVS);
+		vec4 terrain3 = texture(tex3, textureVS);
+		vec4 splat = texture(tex4, textureVS / 2800);
+		gl_Color = (splat.x * terrain1 + splat.y * terrain2 + splat.z * terrain3) * diffuse + vec4(1,1,1,1) * specularCoefficient;
 	}
 
 	if (!isTerrain && !isSkybox) {
-		gl_Color = texture(tex, texture_out) * diffuse;
+		gl_Color = texture(tex, textureVS) * (ambient + diffuseColor * diffuse + specularColor * specularCoefficient);
 	}
 
-	mat4 invView = inverse(worldToView);
-	vec3 cameraPos = vec3(invView[3][0], invView[3][1], invView[3][2]);
-
 	if (isSkybox) {
-		vec3 dirToFrag = normalize(fragment_out);
-		gl_Color = texture(cubeMap, dirToFrag);
+		gl_Color = texture(cubeMap, fragment);
 	}
 
 	// Fade far away objects
-	float camDistance = length(cameraPos - fragment_out);
+	float camDistance = length(viewPositionVS - fragmentVS);
 	float distanceStartFade = 100;
 	float distanceEndFade = 1000;
 	if (camDistance > distanceStartFade && !isSkybox) {
-		float saturation = clamp((camDistance - distanceStartFade) / (distanceEndFade - distanceStartFade), 0, 1);
-		gl_Color = vec4(saturate(gl_Color.xyz, 1 - saturation), 1);
-		gl_Color = mix(gl_Color, vec4(0.27, 0.43, 0.66, 1), saturation);
-	}	
+	//	float saturation = clamp((camDistance - distanceStartFade) / (distanceEndFade - distanceStartFade), 0, 1);
+	//	gl_Color = vec4(saturate(gl_Color.xyz, 1 - saturation), 1);
+	//	gl_Color = mix(gl_Color, vec4(0.27, 0.43, 0.66, 1), saturation);
+	}
 
+	
 	gl_Color.w = 1;
 }

@@ -68,6 +68,9 @@ void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, entity.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, entity.normalMapId);
+	glUniform1i(glGetUniformLocation(shaderProgram, "normalMap"), 4);
 	glDrawElements(GL_TRIANGLES, entity.getModel().numIndices, GL_UNSIGNED_INT, (void*)(entity.getModel().offset * sizeof(GLuint)));
 }
 
@@ -188,79 +191,6 @@ GLuint createSkybox() {
 	return texId;
 }
 
-GLuint getVAOBox() {
-	GLuint vao = 0;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	float vertexData[] = {
-		-1, -1, 1, // Front
-		-1, 1, 1,
-		1, -1, 1,
-
-		1, 1, 1, // Front
-		-1, 1, 1,
-		1, -1, 1,
-
-		-1, -1, -1, // Back
-		-1, 1, -1,
-		1, -1, -1,
-
-		1, 1, -1, // Back
-		-1, 1, -1,
-		1, -1, -1,
-
-		-1, 1, -1, // Left
-		-1, -1, -1,
-		-1, -1, 1,
-
-		-1, 1, -1, // Left
-		-1, 1, 1,
-		-1, -1, 1,
-
-		1, 1, -1, // Right
-		1, -1, -1,
-		1, -1, 1,
-
-		1, 1, -1, // Right
-		1, 1, 1,
-		1, -1, 1,
-
-		-1, 1, -1, // Top
-		-1, 1, 1,
-		1, 1, 1,
-
-		-1, 1, -1, // Top
-		1, 1, -1,
-		1, 1, 1,
-
-		-1, -1, -1, // Bottom
-		-1, -1, 1,
-		1, -1, 1,
-
-		-1, -1, -1, // Bottom
-		1, -1, -1,
-		1, -1, 1,
-	};
-
-	GLuint indexData[] = {
-		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ,16 ,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
-	};
-
-	GLuint vertexBuffer = 0;
-	glGenBuffers(1, &vertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 36, vertexData, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	GLuint indexBuffer = 0;
-	glGenBuffers(1, &indexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indexData, GL_STATIC_DRAW);
-
-	return vao;
-}
 
 GLuint getShader() {
 	std::string vertexSource = readFile("Source\\vertexShader.glsl");
@@ -558,11 +488,11 @@ int main() {
 	glUseProgram(shaderProgram);
 
 	const int size = 129;
-	const int tileSizeXZ = 40;
+	const int tileSizeXZ = 1;
 	const int tileSizeY = 1;
 	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
 	float *heightmapData = new float[size * size];
-	diamondSquare(heightmapData, size, 0.3f, seed);
+	diamondSquare(heightmapData, size, 10.3f, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
 	const int numSubdivisions = 2;
 
@@ -578,35 +508,43 @@ int main() {
 	ground.setModel(terrain);
 	ground.position = glm::vec3(0, 0, 0);
 	ground.scale = glm::vec3(1, 1, 1);
-	ground.textureId = loadPNGTexture("Resources/grass512.png");
+	//ground.textureId = loadPNGTexture("Resources/grass512.png");
 	ground.setTextureId2(loadPNGTexture("Resources/sand512.png"));
 	ground.setTextureId3(loadPNGTexture("Resources/rock512.png"));
 	ground.setTextureId4(loadPNGTexture("Resources/terrain-splatmap.png"));
 
 	GLuint jasTexture = loadPNGTexture("Resources/jas.png");
+	GLuint jasNormalMap = loadPNGTexture("Resources/metal-normalmap.png");
 	std::vector<Entity*> airplane = loadJAS39Gripen("Resources/jas.obj");
 	airplane[0]->position = glm::vec3(10, 100, 10);
 	airplane[0]->scale = glm::vec3(0.2f, 0.2f, 0.2f);
 	airplane[0]->centerToGroundContactPoint = -0.2f;
 	for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
 		(*iter)->textureId = jasTexture;
+		(*iter)->normalMapId = jasNormalMap;
 	}
 
 	Entity skybox = Entity();
-	Model box = Model();
-	box.vao = getVAOBox();
-	box.numIndices = 36;
-	skybox.setModel(box);
+	skybox.setModel(getVAOCube());
 	skybox.scale = glm::vec3(20, 20, 20);
 	skybox.position = glm::vec3(0, -10, 0);
 	skybox.textureId = createSkybox();
+
+	Entity cube = Entity();
+	cube.setModel(getVAOCube());
+	cube.scale = glm::vec3(1, 1, 1);
+	cube.position = glm::vec3(10, 100, 14);
+	cube.textureId = loadPNGTexture("Resources/grass512.png");
+	cube.normalMapId = loadPNGTexture("Resources/normalmap.png");
 
 	glClearColor(0.27, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glFrontFace(GL_CCW);
-	glCullFace(GL_BACK);
+
+	//glEnable(GL_CULL_FACE);
+	//glFrontFace(GL_CW);
+	//glCullFace(GL_BACK);
 
 	float lastTime = glfwGetTime();
 	float currentTime;
@@ -617,16 +555,16 @@ int main() {
 		lastTime = currentTime;
 		basicSteering(cameraPosition, cameraForward, cameraUp);
 
-		steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
-		airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		//steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		//airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
 		terrainCollision(heightmapData, size, tileSizeXZ, *airplane[0]);
 
 		// Normal camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
 
-		glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f;
-		interpolateCamera(targetPosition, cameraPosition);
-		cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
+		//glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f;
+		//interpolateCamera(targetPosition, cameraPosition);
+		//cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
 
 		// Render entities
 		renderSkybox(skybox, shaderProgram, cam, perspective);
@@ -634,6 +572,7 @@ int main() {
 		for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
 			renderEntity(**iter, shaderProgram, cam, perspective);
 		}
+		renderEntity(cube, shaderProgram, cam, perspective);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
