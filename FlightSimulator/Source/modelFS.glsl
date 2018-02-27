@@ -1,4 +1,3 @@
-#version 460
 
 uniform sampler2D tex;
 uniform sampler2D normalMap;

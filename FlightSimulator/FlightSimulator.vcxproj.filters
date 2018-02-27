@@ -49,5 +49,6 @@
     <None Include="Source\modelVS.glsl" />
     <None Include="Source\terrainVS.glsl" />
     <None Include="Source\terrainFS.glsl" />
+    <None Include="Source\common.glsl" />
   </ItemGroup>
 </Project>

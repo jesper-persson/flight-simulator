@@ -1,4 +1,3 @@
-#version 460
 
 uniform samplerCube cubeMap;
 

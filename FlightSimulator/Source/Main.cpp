@@ -194,10 +194,16 @@ GLuint createSkybox() {
 }
 
 GLuint getShader(std::string vertexShaderPath, std::string fragmentShaderPath) {
+	std::string commonSource = readFile("Source/common.glsl");
+	const GLchar* commonSourceC = (const GLchar *)commonSource.c_str();
+
 	std::string vertexSource = readFile(vertexShaderPath);
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	const GLchar* vertexSourceC = (const GLchar *)vertexSource.c_str();
-	glShaderSource(vertexShader, 1, &vertexSourceC, 0);
+	const GLchar *vertexShaderFiles[2] = {
+		commonSource.c_str(),
+		vertexSource.c_str()
+	};
+	glShaderSource(vertexShader, 2, vertexShaderFiles, 0);
 
 	glCompileShader(vertexShader);
 	GLint isCompiledVertex = 0;
@@ -215,8 +221,11 @@ GLuint getShader(std::string vertexShaderPath, std::string fragmentShaderPath) {
 
 	std::string fragmentSource = readFile(fragmentShaderPath);
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	const GLchar* fragmentSourceC = (const GLchar *)fragmentSource.c_str();
-	glShaderSource(fragmentShader, 1, &fragmentSourceC, 0);
+	const GLchar *fragmentShaderFiles[2] = {
+		commonSource.c_str(),
+		fragmentSource.c_str()
+	};
+	glShaderSource(fragmentShader, 2, fragmentShaderFiles, 0);
 
 	glCompileShader(fragmentShader);
 	GLint isCompiledFragment = 0;
@@ -604,7 +613,7 @@ int main() {
 		basicSteering(cameraPosition, cameraForward, cameraUp);
 
 		//steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
-		//airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
 		terrainCollision(heightmapData, size, tileSizeXZ, *airplane[0]);
 
 		// Normal camera

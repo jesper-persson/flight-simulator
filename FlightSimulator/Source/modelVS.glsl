@@ -1,4 +1,4 @@
-#version 460
+
 
 layout(location = 0) in vec3 positionModelSpace;
 layout(location = 1) in vec3 normalModelSpace;
