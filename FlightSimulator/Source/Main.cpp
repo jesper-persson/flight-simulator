@@ -62,8 +62,11 @@ glm::mat4 getEntityTransformation(Entity &entity) {
 void bindLight(GLuint shaderProgram, Light *light, int numLights) {
 	glUseProgram(shaderProgram);
 	for (int i = 0; i < numLights; i++) {
-		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].position")).c_str()), light->position.x, light->position.y, light->position.z);
-		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].direction")).c_str()), light->direction.x, light->direction.y, light->direction.z);
+		glm::mat4 transformation = getEntityTransformation(*light);
+		glm::vec4 worldPosition = transformation * glm::vec4(0, 0, 0, 1);
+		glm::vec4 worldForward = glm::normalize( transformation * glm::vec4(0, 0, 1, 0) );
+		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].position")).c_str()), worldPosition.x, worldPosition.y, worldPosition.z);
+		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].direction")).c_str()), worldForward.x, worldForward.y, worldForward.z);
 		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].color")).c_str()), light->color.x, light->color.y, light->color.z);
 		glUniform1f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].intensity")).c_str()), light->intensity);
 		glUniform1i(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].type")).c_str()), light->lightType);
@@ -115,7 +118,7 @@ void renderTerrain(Terrain &terrain, GLuint shaderProgram, glm::mat4 &worldToVie
 	renderEntity(terrain, shaderProgram, worldToView, perspective, true);
 }
 
-void renderSkybox(Entity &skybox, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+void renderSkybox(Entity &skybox, GLuint secondSkyboxTexture, float interpolation, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
 	glDisable(GL_DEPTH_TEST);
 	glUseProgram(shaderProgram);
 	glm::mat4 translation = glm::translate(glm::mat4(), skybox.position);
@@ -128,11 +131,15 @@ void renderSkybox(Entity &skybox, GLuint shaderProgram, glm::mat4 &worldToView, 
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "cubeMap"), 10);
+	glActiveTexture(GL_TEXTURE11);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, secondSkyboxTexture);
+	glUniform1i(glGetUniformLocation(shaderProgram, "cubeMap2"), 11);
+	glUniform1f(glGetUniformLocation(shaderProgram, "interpolation"), interpolation);
 	glDrawElements(GL_TRIANGLES, skybox.getModel().numIndices, GL_UNSIGNED_INT, (void*)0);
 	glEnable(GL_DEPTH_TEST);
 }
 
-void runPhysics(Entity &ground, Entity &entity, float dt) {
+void runPhysics(Entity &entity, float dt) {
 	glm::vec3 gravity = glm::vec3(0, -0.4f, 0);
 	glm::vec3 netForce =  entity.impulse + gravity;
 	entity.impulse = glm::vec3(0, 0, 0);
@@ -140,11 +147,16 @@ void runPhysics(Entity &ground, Entity &entity, float dt) {
 	entity.position = entity.position + entity.velocity * dt;
 }
 
+float getHeightAt(float *heightmap, int size, float tileSize, float positionX, float positionZ) {
+	int tileX = positionX / tileSize;
+	int tileZ = positionZ / tileSize;
+	float height = heightmap[tileZ * size + tileX];
+	return height;
+}
+
 // Should also interpolate over triangle
 void terrainCollision(float *heightmap, int size, float tileSize, Entity &entity) {
-	int tileX = entity.position.x / tileSize;
-	int tileZ = entity.position.z / tileSize;
-	float height = heightmap[tileZ * size + tileX];
+	float height = getHeightAt(heightmap, size, tileSize, entity.position.x, entity.position.z);
 	if (height > entity.position.y + entity.centerToGroundContactPoint) {
 		entity.position.y = height - entity.centerToGroundContactPoint;
 		entity.velocity.y = 0;
@@ -163,18 +175,18 @@ std::vector<unsigned char> loadPNG(std::string filename) {
 	return image;
 }
 
-GLuint createSkybox() {
+GLuint createSkybox(std::string x1, std::string x2, std::string y1, std::string y2, std::string z1, std::string z2) {
 	GLuint texId;
 	glGenTextures(1, &texId);
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
 
-	std::vector<unsigned char> xPos = loadPNG("Resources/skybox-x-.png");
-	std::vector<unsigned char> xNeg = loadPNG("Resources/skybox-x+.png");
-	std::vector<unsigned char> yPos = loadPNG("Resources/skybox-y+.png");
-	std::vector<unsigned char> yNeg = loadPNG("Resources/skybox-y-.png");
-	std::vector<unsigned char> zPos = loadPNG("Resources/skybox-z+.png");
-	std::vector<unsigned char> zNeg = loadPNG("Resources/skybox-z-.png");
+	std::vector<unsigned char> xPos = loadPNG(x1);
+	std::vector<unsigned char> xNeg = loadPNG(x2);
+	std::vector<unsigned char> yPos = loadPNG(y1);
+	std::vector<unsigned char> yNeg = loadPNG(y2);
+	std::vector<unsigned char> zPos = loadPNG(z1);
+	std::vector<unsigned char> zNeg = loadPNG(z2);
 	const int size = 2048; // Should be returned from loader
 
 	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &xPos[0]);
@@ -472,7 +484,8 @@ void glDebugMessageCallbackFunction(GLenum source, GLenum type, GLuint id, GLenu
 int main() {
 	const int windowHeight = 900;
 	const int windowWidth = 1700;
-	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, windowWidth / (float)windowHeight, .1f, 1000);
+	glm::mat4 perspective = glm::perspective<GLfloat>(0.8f, windowWidth / (float)windowHeight, .1f, 1500);
+	glm::mat4 perspectiveForSun = glm::perspective<GLfloat>(0.8f, windowWidth / (float)windowHeight, .1f, 51500);
 
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit()) {
@@ -502,12 +515,12 @@ int main() {
 	GLuint skyboxShader = getShader("Source/skyboxVS.glsl", "Source/skyboxFS.glsl");
 	GLuint terrainShader = getShader("Source/terrainVS.glsl", "Source/terrainFS.glsl");
 
-	const int size = 129;
-	const int tileSizeXZ = 1;
+	const int size = 257;
+	const int tileSizeXZ = 10;
 	const int tileSizeY = 1;
 	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
 	float *heightmapData = new float[size * size];
-	diamondSquare(heightmapData, size, 10.3f, seed);
+	diamondSquare(heightmapData, size, 1.3f, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
 	const int numSubdivisions = 2;
 
@@ -531,7 +544,7 @@ int main() {
 	GLuint jasTexture = loadPNGTexture("Resources/jas.png");
 	GLuint jasNormalMap = loadPNGTexture("Resources/metal-normalmap.png");
 	std::vector<Entity*> airplane = loadJAS39Gripen("Resources/jas.obj");
-	airplane[0]->position = glm::vec3(10, 100, 10);
+	airplane[0]->position = glm::vec3(10, 10, 20);
 	airplane[0]->scale = glm::vec3(0.2f, 0.2f, 0.2f);
 	airplane[0]->centerToGroundContactPoint = -0.2f;
 	for (std::vector<Entity*>::iterator iter = airplane.begin(); iter != airplane.end(); iter++) {
@@ -543,7 +556,9 @@ int main() {
 	skybox.setModel(getVAOCube());
 	skybox.scale = glm::vec3(20, 20, 20);
 	skybox.position = glm::vec3(0, -10, 0);
-	skybox.textureId = createSkybox();
+	skybox.textureId = createSkybox("Resources/skybox-x-.png", "Resources/skybox-x+.png", "Resources/skybox-y+.png", "Resources/skybox-y-.png", "Resources/skybox-z-.png", "Resources/skybox-z+.png");
+	GLuint secondSkybox = createSkybox("Resources/skybox-night-x-.png", "Resources/skybox-night-x+.png", "Resources/skybox-night-y+.png", "Resources/skybox-night-y-.png", "Resources/skybox-night-z-.png", "Resources/skybox-night-z+.png");
+	
 
 	Entity cube = Entity();
 	cube.setModel(getVAOCube());
@@ -554,45 +569,64 @@ int main() {
 
 	Light directionalLight = Light();
 	directionalLight.lightType = LightType::DIRECTIONAL_LIGHT;
-	directionalLight.direction = glm::normalize(glm::vec3(0, -1, 0));
+	directionalLight.forward = glm::normalize(glm::vec3(0, -1, 0));
+	directionalLight.up = glm::normalize(glm::vec3(0, 0, 1));
 	directionalLight.color = glm::vec3(1, 1, 1);
-	directionalLight.intensity = 3.5;
-	directionalLight.setModel(getVAOCube());
+	directionalLight.intensity = 3.4;
+	Model sunModel = getVAOCube();
+	sunModel.color = glm::vec4(directionalLight.color.x, directionalLight.color.y, directionalLight.color.z, 1);
+	directionalLight.setModel(sunModel);
 	directionalLight.position = glm::vec3(50, 50, 50);
-	directionalLight.scale = glm::vec3(1, 1, 1);
+	directionalLight.scale = glm::vec3(100, 100, 100);
 
 	Light spotlight = Light();
+	spotlight.setParentEntity(airplane[0]);
 	spotlight.lightType = LightType::SPOTLIGHT;
-	spotlight.cutoffAngle = 0.4f;
-	spotlight.attenuationC1 = 0;
+	spotlight.cutoffAngle = 0.2f;
+	spotlight.attenuationC1 = 0.00001;
 	spotlight.attenuationC2 = 0;
-	spotlight.direction = glm::normalize(glm::vec3(0, -1, 0));
+	spotlight.forward = glm::normalize(glm::vec3(0, -1, 4));
+	spotlight.up = glm::normalize(glm::vec3(0, 4, 1));
 	spotlight.color = glm::vec3(0.9, 0.94, 1);
-	spotlight.intensity = 2;
+	spotlight.intensity = 10;
 	Model spotlightModel = getVAOCube();
 	spotlightModel.color = glm::vec4(spotlight.color.x, spotlight.color.y, spotlight.color.z, 1);
 	spotlight.setModel(spotlightModel);
-	spotlight.position = glm::vec3(50, 30, 50);
-	spotlight.scale = glm::vec3(1, 1, 1);
+	spotlight.position = glm::vec3(0, 0, 10);
+	spotlight.scale = glm::vec3(0.1, 0.1, 0.1);
 
 	Light pointLight = Light();
+	pointLight.setParentEntity(airplane[0]);
 	pointLight.lightType = LightType::POINT_LIGHT;
-	pointLight.attenuationC1 = 0.01;
-	pointLight.attenuationC2 = 0.01;
-	pointLight.color = glm::vec3(0, 1, 0);
-	pointLight.intensity = 5;
+	pointLight.attenuationC1 = 0.1;
+	pointLight.attenuationC2 = 0.1;
+	pointLight.color = glm::vec3(1 , 0.5 , 0.5);
+	pointLight.intensity = 3;
 	Model pointLightModel = getVAOCube();
 	pointLightModel.color = glm::vec4(pointLight.color.x, pointLight.color.y, pointLight.color.z, 1);
 	pointLight.setModel(pointLightModel);
-	pointLight.position = glm::vec3(100, -2, 100);
-	pointLight.scale = glm::vec3(0.1, 0.1, 0.1);
+	pointLight.position = glm::vec3(-4, 0.1, -3);
+	pointLight.scale = glm::vec3(0.05, 0.05, 0.05);
 
+	Light pointLight2 = Light();
+	pointLight2.lightType = LightType::POINT_LIGHT;
+	pointLight2.attenuationC1 = 0.001;
+	pointLight2.attenuationC2 = 0.001;
+	pointLight2.centerToGroundContactPoint = -10;
+	pointLight2.color = glm::vec3(0, 1, 0.5);
+	pointLight2.intensity = 10;
+	Model pointLightModel2 = getVAOCube();
+	pointLightModel2.color = glm::vec4(pointLight2.color.x, pointLight2.color.y, pointLight2.color.z, 1);
+	pointLight2.setModel(pointLightModel2);
+	pointLight2.position = glm::vec3(100, 50, 100);
+	pointLight2.scale = glm::vec3(1.05, 1.05, 1.05);
 
 	Light lights[10];
 	lights[0] = directionalLight;
 	lights[1] = spotlight;
 	lights[2] = pointLight;
-	int numLights = 3;
+	lights[3] = pointLight2;
+	int numLights = 4;
 
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -610,25 +644,52 @@ int main() {
 		float currentTime = glfwGetTime();
 		float dt = currentTime - lastTime;
 		lastTime = currentTime;
-		basicSteering(cameraPosition, cameraForward, cameraUp);
+		//basicSteering(cameraPosition, cameraForward, cameraUp);
 
-		//steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
 		airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
 		terrainCollision(heightmapData, size, tileSizeXZ, *airplane[0]);
+
+		for (int i = 0; i < numLights; i++) {
+			if (lights[i].getParentEntity()) {
+				continue;
+			}
+			runPhysics(lights[i], dt);
+			terrainCollision(heightmapData, size, tileSizeXZ, lights[i]);
+		}
 
 		// Normal camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
 
-		//glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f;
-		//interpolateCamera(targetPosition, cameraPosition);
-		//cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
+		glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f;
+		interpolateCamera(targetPosition, cameraPosition);
+		cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
 
-		lights[1].position.x = 10 * sin(glfwGetTime() / (float)1) + 20;
-		lights[1].position.z = 10 * cos(glfwGetTime() / (float)1) + 20;
+		lights[3].position.x = 100 * sin(glfwGetTime() / (float)10) + 400;
+		lights[3].position.z = 100 * cos(glfwGetTime() / (float)10) + 400;
+
+		lights[2].intensity = 4;
+		lights[3].intensity = 4 * sin(glfwGetTime() * 2) + 4;
+		if ((int)(glfwGetTime()*10) % 10 != 0) {
+			lights[2].intensity = 0;
+		}
+
+		// Animate sun (make sure direction always faces middle of ground
+		Light *sun = &lights[0];
+		float centerPosition = (float)(size * tileSizeXZ) / 2.0f;
+		glm::vec3 center = glm::vec3(centerPosition, getHeightAt(heightmapData, size, tileSizeXZ, centerPosition, centerPosition), centerPosition);
+		float time = glfwGetTime() / 15;
+		sun->position.z = centerPosition;
+		sun->position.y = cos(time) * centerPosition * 2 + center.y;
+		sun->position.x = sin(time) * centerPosition * 2 + centerPosition;
+		sun->up = glm::vec3(0, 0, 1);
+		sun->forward = glm::normalize(center - sun->position);
+		float interpolation = (cos(time) + 1) / 2.0f;
 
 		// Render entities
-		renderSkybox(skybox, skyboxShader, cam, perspective);
+		renderSkybox(skybox, secondSkybox, interpolation, skyboxShader, cam, perspective);
 		bindLight(terrainShader, lights, numLights);
+		bindLight(modelShader, lights, numLights);
 		renderTerrain(ground, terrainShader, cam, perspective);
 		for (int i = 0; i < airplane.size(); i++) {
 			if (i == 8 || i == 0) {
@@ -642,7 +703,7 @@ int main() {
 
 		// Draw lights
 		for (int i = 0; i < numLights; i++) {
-			renderEntity(lights[i], modelShader, cam, perspective, false);
+			renderEntity(lights[i], modelShader, cam, perspectiveForSun, false);
 		}
 
 		glfwSwapBuffers(window);

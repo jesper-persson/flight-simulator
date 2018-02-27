@@ -112,10 +112,10 @@ private:
 enum LightType { DIRECTIONAL_LIGHT, POINT_LIGHT, SPOTLIGHT };
 
 // When setting position, use position from Entity
+// When setting direction for spotlights, use forward from Entity
 class Light : public Entity {
 public:
 	LightType lightType;
-	glm::vec3 direction;
 	glm::vec3 color;
 	float cutoffAngle;
 	float intensity;

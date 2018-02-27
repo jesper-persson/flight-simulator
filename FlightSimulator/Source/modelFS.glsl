@@ -1,10 +1,10 @@
-
 uniform sampler2D tex;
 uniform sampler2D normalMap;
 uniform mat4 worldToView;
 
 uniform bool useLights;
 
+uniform Light lights[10]; // Max 10 ligths
 uniform vec3 Ka, Kd, Ks;
 uniform float specularExponent;
 uniform float dissolve;
@@ -45,33 +45,16 @@ void main() {
 		fragment = fragmentPositionTangentSpaceVS;
 	}
 
-	// Directional light
-	vec3 fragToLight = -lightDirection;
-	float diffuse = dot(fragToLight, normal) * 1.5;
-	vec4 diffuseColor = vec4(Kd, 1);
-	
-
-	// Specular highlight
-	vec3 reflectionDirection = reflect(lightDirection, normalize(normal));
-	vec3 surfaceToCamera = normalize(viewPosition - fragment);
-	float cosAngle = max(0.0, dot(surfaceToCamera, reflectionDirection));
-	float specularCoefficient = pow(cosAngle, specularExponent);
-	vec4 specularColor = vec4(Ks.xyz, 1);
-
-	//  Fix issue where specular shines through object (not really)
-	if (dot(normal, lightDirection) >= 0) {
-		specularCoefficient = 0;
-	}
-
-
 	vec4 totalLight = vec4(1, 1, 1, 1);
 	if (useLights) {
-		totalLight = (ambient + diffuseColor * diffuse + specularColor * specularCoefficient);
+		totalLight = vec4(0, 0, 0, 0);	
+		for (int i = 0; i < 10; i++) {
+			totalLight = totalLight + calculateLight(lights[i], vec3(0.5, 0.5, 0.5), vec3(0, 0, 0), fragmentVS, normalVS, viewPositionVS);
+		}
 	}
 
 	vec4 textureColor = texture(tex, textureVS) + color;
 	gl_Color = textureColor * totalLight;
-
 
 	// Fade far away objects
 	// float camDistance = length(viewPositionVS - fragmentVS);
