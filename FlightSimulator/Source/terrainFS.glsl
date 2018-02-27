@@ -4,7 +4,7 @@ struct Light {
 	int type; // 0 = directional, 1 = point light, 2 = spotlight
 	vec3 position;
 	vec3 direction; // For directional light and spotlight
-	float cutoffAngle; // For spotlight
+	float cutoffAngle; // For spotlight, in radians
 	float intensity; // For directional light since they don't use attenuation
 	vec3 color;
 	float attenuationC1;
@@ -59,7 +59,12 @@ vec4 calculateLight(Light light, vec3 diffuse, vec3 specular) {
 	}
 
 	if (isSpot(light)) {
-		if (acos(dot(lightToFragment, light.direction)) > light.cutoffAngle) {
+		float lambda = acos(dot(lightToFragment, light.direction)); // Current fragment "angle"
+		float outerCutoffAngle = light.cutoffAngle + 0.02;
+		if (lambda >= light.cutoffAngle) {
+			attenuation = (outerCutoffAngle - lambda) / (outerCutoffAngle - light.cutoffAngle);
+		}
+		if (lambda > outerCutoffAngle) {
 			attenuation = 0;
 		}
 	}
