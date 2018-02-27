@@ -1,9 +1,21 @@
 #version 460
 
+struct Light {
+	int type; // 0 = directional, 1 = point light, 2 = spotlight
+	vec3 position;
+	vec3 direction; // For directional light and spotlight
+	float cutoffAngle; // For spotlight
+	float intensity; // For directional light since they don't use attenuation
+	vec3 color;
+	float attenuationC1;
+	float attenuationC2;
+};
+
 uniform sampler2D tex;
 uniform sampler2D tex2;
 uniform sampler2D tex3;
 uniform sampler2D tex4;
+uniform Light lights[10]; // Max 10 ligths
 
 in vec3 lightDirectionVS;
 in vec3 viewPositionVS;
@@ -19,28 +31,88 @@ vec3 saturate(vec3 color, float saturate) {
     return mix(intensity, color, saturate);
 }
 
-void main() {
-	vec4 ambient = vec4(0.3,0.3,0.3,1);
-	vec3 normal = normalize(normalVS);
+bool isDirectional(Light light) {
+	return light.type == 0;
+}
 
-	// Directional light
-	vec3 fragToLight = -lightDirectionVS;
-	float diffuse = dot(fragToLight, normal) * 1.5;
-	vec4 diffuseColor = vec4(1, 1, 1, 1);
+bool isPoint(Light light) {
+	return light.type == 1;
+}
+
+bool isSpot(Light light) {
+	return light.type == 2;
+}
+
+vec4 calculateLight(Light light, vec3 diffuse, vec3 specular) {
+	if (light.type == -1) {
+		return vec4(0, 0, 0, 0);
+	}
+	vec3 lightToFragment = normalize(fragmentVS - light.position);
+	float attenuation = 1;
+	if (isDirectional(light)) {
+		lightToFragment = light.direction;
+	}
+
+	if (isPoint(light) || isSpot(light)) {
+		float lightToFragmentDistance = length(light.position - fragmentVS);
+		attenuation = 1 / (1.0 + light.attenuationC1 * lightToFragmentDistance + light.attenuationC1 * lightToFragmentDistance * lightToFragmentDistance);
+	}
+
+	if (isSpot(light)) {
+		if (acos(dot(lightToFragment, light.direction)) > light.cutoffAngle) {
+			attenuation = 0;
+		}
+	}
+
+	vec3 fragmentToLight = -lightToFragment;
+	vec3 fragmentToView = normalize(viewPositionVS - fragmentVS);
+	float diffuseIntensity = dot(fragmentToLight, normalize(normalVS)) * attenuation * light.intensity;
 	
-	// Specular highlight
-	vec3 reflectionDirection = reflect(lightDirectionVS, normal);
-	vec3 surfaceToCamera = normalize(viewPositionVS - fragmentVS);
-	float cosAngle = max(0.0, dot(surfaceToCamera, reflectionDirection));
-	float specularExponent = 2000;
-	float specularCoefficient = pow(cosAngle, specularExponent);
-	vec4 specularColor = vec4(0.5, 0.5, 0.6, 1);
+	vec3 reflectionDirection = reflect(lightToFragment, normalize(normalVS));
+	float cosAngle = max(0.0, dot(fragmentToView, reflectionDirection));
+	float specularExponent = 1f;
+	float specularIntensity = pow(cosAngle, specularExponent) * attenuation * light.intensity;
 
+	vec3 result = diffuseIntensity * light.color * diffuse + specularIntensity * light.color * specular;
+	return vec4(result, 1);
+}
+
+void main() {
 	vec4 terrain1 = texture(tex, textureVS);
 	vec4 terrain2 = texture(tex2, textureVS);
 	vec4 terrain3 = texture(tex3, textureVS);
 	vec4 splat = texture(tex4, textureVS / 40);
-	gl_Color = (splat.x * terrain1 + splat.y * terrain2 + splat.z * terrain3) * diffuse + specularColor * specularCoefficient;
+	vec4 terrainColor = (splat.x * terrain1 + splat.y * terrain2 + splat.z * terrain3);
+
+	// Light directionalLight;
+	// directionalLight.type = 0;
+	// directionalLight.direction = normalize(vec3(0, -1, 0));
+	// directionalLight.intensity = 1;
+	// directionalLight.color = vec3(1, 1, 1);
+
+	// Light pointLight;
+	// pointLight.type = 1;
+	// pointLight.position = vec3(40, 4, 40);
+	// pointLight.attenuationC1 = 0.001;
+	// pointLight.attenuationC2 = 0;
+	// pointLight.color = vec3(1, 0, 0);
+
+	// Light spotlight;
+	// spotlight.cutoffAngle = 0.9;
+	// spotlight.type = 2;
+	// spotlight.position = vec3(20, 5, 10);
+	// spotlight.direction = normalize(vec3(0, -4, 1));
+	// spotlight.attenuationC1 = 0.001;
+	// spotlight.attenuationC2 = 0;
+	// spotlight.color = vec3(1, 1, 1);
+
+	// Combine lights
+	vec4 totalLight = vec4(0, 0, 0, 0);
+	for (int i = 0; i < 10; i++) {
+		totalLight = totalLight + calculateLight(lights[i], vec3(0.5, 0.5, 0.5), vec3(0, 0, 0));
+	}
+	gl_Color = terrainColor * totalLight;
+
 
 	// Fade far away objects
 	// float camDistance = length(viewPositionVS - fragmentVS);

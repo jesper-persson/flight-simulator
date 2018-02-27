@@ -27,7 +27,7 @@ void main(void) {
 
 	mat3 TBN = transpose(mat3(tangent, bitangent, normalVS));
 
-	lightDirectionVS = normalize(vec3(1, 0, -1));
+	lightDirectionVS = normalize(vec3(1, -1, -1));
 	lightDirectionTangentSpaceVS = TBN * lightDirectionVS;
 	mat4 invView = inverse(worldToView);
 	viewPositionVS = vec3(invView[3][0], invView[3][1], invView[3][2]);

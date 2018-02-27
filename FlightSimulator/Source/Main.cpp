@@ -59,18 +59,37 @@ glm::mat4 getEntityTransformation(Entity &entity) {
 	}
 }
 
-void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
+void bindLight(GLuint shaderProgram, Light *light, int numLights) {
+	glUseProgram(shaderProgram);
+	for (int i = 0; i < numLights; i++) {
+		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].position")).c_str()), light->position.x, light->position.y, light->position.z);
+		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].direction")).c_str()), light->direction.x, light->direction.y, light->direction.z);
+		glUniform3f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].color")).c_str()), light->color.x, light->color.y, light->color.z);
+		glUniform1f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].intensity")).c_str()), light->intensity);
+		glUniform1i(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].type")).c_str()), light->lightType);
+		glUniform1f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].cutoffAngle")).c_str()), light->cutoffAngle);
+		glUniform1f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].attenuationC1")).c_str()), light->attenuationC1);
+		glUniform1f(glGetUniformLocation(shaderProgram, (std::string("lights[") + std::to_string(i) + std::string("].attenuationC2")).c_str()), light->attenuationC2);
+		light++;
+	}
+}
+
+void renderEntity(Entity &entity, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective, bool useLights) {
 	glUseProgram(shaderProgram);
 	glm::mat4 transformation = getEntityTransformation(entity);
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modelToWorld"), 1, GL_FALSE, glm::value_ptr(transformation));
 
+	Model model = entity.getModel();
 	glUniform3f(glGetUniformLocation(shaderProgram, "Ka"), entity.getModel().Ka.x, entity.getModel().Ka.y, entity.getModel().Ka.z);
 	glUniform3f(glGetUniformLocation(shaderProgram, "Kd"), entity.getModel().Kd.x, entity.getModel().Kd.y, entity.getModel().Kd.z);
 	glUniform3f(glGetUniformLocation(shaderProgram, "Ks"), entity.getModel().Ks.x, entity.getModel().Ks.y, entity.getModel().Ks.z);
 	glUniform1f(glGetUniformLocation(shaderProgram, "specularExponent"), entity.getModel().Ns);
 	glUniform1f(glGetUniformLocation(shaderProgram, "dissolve"), entity.getModel().d);
+	glUniform4f(glGetUniformLocation(shaderProgram, "color"), model.color.x, model.color.y, model.color.z, model.color.w);
+
+	glUniform1i(glGetUniformLocation(shaderProgram, "useLights"), useLights);
 
 	glBindVertexArray(entity.getModel().vao);
 	glActiveTexture(GL_TEXTURE0);
@@ -93,7 +112,7 @@ void renderTerrain(Terrain &terrain, GLuint shaderProgram, glm::mat4 &worldToVie
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex2"), 1);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex3"), 2);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex4"), 3);
-	renderEntity(terrain, shaderProgram, worldToView, perspective);
+	renderEntity(terrain, shaderProgram, worldToView, perspective, true);
 }
 
 void renderSkybox(Entity &skybox, GLuint shaderProgram, glm::mat4 &worldToView, glm::mat4 &perspective) {
@@ -489,7 +508,7 @@ int main() {
 		}
 	}
 
-	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 40);
+	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 40 * tileSizeXZ);
 
 	Terrain ground = Terrain();
 	ground.setModel(terrain);
@@ -524,6 +543,48 @@ int main() {
 	cube.textureId = loadPNGTexture("Resources/grass512.png");
 	cube.normalMapId = loadPNGTexture("Resources/normalmap.png");
 
+	Light directionalLight = Light();
+	directionalLight.lightType = LightType::DIRECTIONAL_LIGHT;
+	directionalLight.direction = glm::normalize(glm::vec3(0, -1, 0));
+	directionalLight.color = glm::vec3(1, 1, 1);
+	directionalLight.intensity = 3.5;
+	directionalLight.setModel(getVAOCube());
+	directionalLight.position = glm::vec3(50, 50, 50);
+	directionalLight.scale = glm::vec3(1, 1, 1);
+
+	Light spotlight = Light();
+	spotlight.lightType = LightType::SPOTLIGHT;
+	spotlight.cutoffAngle = 0.4f;
+	spotlight.attenuationC1 = 0;
+	spotlight.attenuationC2 = 0;
+	spotlight.direction = glm::normalize(glm::vec3(0, -1, 0));
+	spotlight.color = glm::vec3(0.9, 0.94, 1);
+	spotlight.intensity = 2;
+	Model spotlightModel = getVAOCube();
+	spotlightModel.color = glm::vec4(spotlight.color.x, spotlight.color.y, spotlight.color.z, 1);
+	spotlight.setModel(spotlightModel);
+	spotlight.position = glm::vec3(50, 30, 50);
+	spotlight.scale = glm::vec3(1, 1, 1);
+
+	Light pointLight = Light();
+	pointLight.lightType = LightType::POINT_LIGHT;
+	pointLight.attenuationC1 = 0.01;
+	pointLight.attenuationC2 = 0.01;
+	pointLight.color = glm::vec3(0, 1, 0);
+	pointLight.intensity = 5;
+	Model pointLightModel = getVAOCube();
+	pointLightModel.color = glm::vec4(pointLight.color.x, pointLight.color.y, pointLight.color.z, 1);
+	pointLight.setModel(pointLightModel);
+	pointLight.position = glm::vec3(100, -2, 100);
+	pointLight.scale = glm::vec3(0.1, 0.1, 0.1);
+
+
+	Light lights[10];
+	lights[0] = directionalLight;
+	lights[1] = spotlight;
+	lights[2] = pointLight;
+	int numLights = 3;
+
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -553,18 +614,27 @@ int main() {
 		//interpolateCamera(targetPosition, cameraPosition);
 		//cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
 
+		lights[1].position.x = 10 * sin(glfwGetTime() / (float)1) + 20;
+		lights[1].position.z = 10 * cos(glfwGetTime() / (float)1) + 20;
+
 		// Render entities
 		renderSkybox(skybox, skyboxShader, cam, perspective);
+		bindLight(terrainShader, lights, numLights);
 		renderTerrain(ground, terrainShader, cam, perspective);
 		for (int i = 0; i < airplane.size(); i++) {
 			if (i == 8 || i == 0) {
 				continue;
 			}
-			renderEntity(*airplane[i], modelShader, cam, perspective);
+			renderEntity(*airplane[i], modelShader, cam, perspective, true);
 		}
-		renderEntity(*airplane[0], modelShader, cam, perspective);
-		renderEntity(*airplane[8], modelShader, cam, perspective);
-		renderEntity(cube, modelShader, cam, perspective);
+		renderEntity(*airplane[0], modelShader, cam, perspective, true);
+		renderEntity(*airplane[8], modelShader, cam, perspective, true);
+		renderEntity(cube, modelShader, cam, perspective, true);
+
+		// Draw lights
+		for (int i = 0; i < numLights; i++) {
+			renderEntity(lights[i], modelShader, cam, perspective, false);
+		}
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

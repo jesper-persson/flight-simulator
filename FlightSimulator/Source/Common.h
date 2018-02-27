@@ -1,6 +1,7 @@
 #include <string>
 #include <glad\glad.h>
 #include <glm\vec3.hpp>
+#include <glm\vec4.hpp>
 #include <iostream>
 #include <vector>
 
@@ -22,6 +23,7 @@ public:
 		Ka = glm::vec3(0, 0, 0);
 		Kd = glm::vec3(0, 0, 0);
 		Ks = glm::vec3(0, 0, 0);
+		color = glm::vec4(0, 0, 0, 0);
 	}
 	GLuint vao;
 	int offset;
@@ -35,6 +37,7 @@ public:
 	glm::vec3 Ka; // Ambient reflectivity
 	glm::vec3 Kd; // Diffuse reflectivity
 	glm::vec3 Ks; // Specular reflectivity
+	glm::vec4 color;
 };
 
 class Entity {
@@ -104,6 +107,20 @@ private:
 	GLuint textureId2;
 	GLuint textureId3;
 	GLuint textureId4;
+};
+
+enum LightType { DIRECTIONAL_LIGHT, POINT_LIGHT, SPOTLIGHT };
+
+// When setting position, use position from Entity
+class Light : public Entity {
+public:
+	LightType lightType;
+	glm::vec3 direction;
+	glm::vec3 color;
+	float cutoffAngle;
+	float intensity;
+	float attenuationC1;
+	float attenuationC2;
 };
 
 std::string readFile(std::string path);

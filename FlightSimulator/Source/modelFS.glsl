@@ -1,18 +1,15 @@
 #version 460
 
 uniform sampler2D tex;
-uniform sampler2D tex2;
-uniform sampler2D tex3;
-uniform sampler2D tex4;
 uniform sampler2D normalMap;
-uniform samplerCube cubeMap;
-uniform bool isTerrain;
-uniform bool isSkybox;
 uniform mat4 worldToView;
+
+uniform bool useLights;
 
 uniform vec3 Ka, Kd, Ks;
 uniform float specularExponent;
 uniform float dissolve;
+uniform vec4 color;
 
 in vec3 fragmentPositionTangentSpaceVS;
 in vec3 viewPositionTangentSpaceVS;
@@ -32,7 +29,7 @@ vec3 saturate(vec3 color, float saturate) {
 }
 
 void main() {
-	vec4 ambient = vec4(0.3,0.3,0.3,1);
+	vec4 ambient = vec4(0.5,0.5,0.5,1);
 
 	vec3 normal = normalize(normalVS);
 	float normalMapScale = 40;
@@ -41,7 +38,7 @@ void main() {
 	vec3 fragment = fragmentVS;
 	vec3 viewPosition = viewPositionVS;
 
-	bool useNormalMap = !isTerrain && !isSkybox && false;
+	bool useNormalMap = false;
 	if (useNormalMap) {
 		normal = normalTangentSpace;
 		lightDirection = lightDirectionTangentSpaceVS;
@@ -67,31 +64,25 @@ void main() {
 		specularCoefficient = 0;
 	}
 
-	if (isTerrain) {
-		vec4 terrain1 = texture(tex, textureVS);
-		vec4 terrain2 = texture(tex2, textureVS);
-		vec4 terrain3 = texture(tex3, textureVS);
-		vec4 splat = texture(tex4, textureVS / 2800);
-		gl_Color = (splat.x * terrain1 + splat.y * terrain2 + splat.z * terrain3) * diffuse + vec4(1,1,1,1) * specularCoefficient;
+
+	vec4 totalLight = vec4(1, 1, 1, 1);
+	if (useLights) {
+		totalLight = (ambient + diffuseColor * diffuse + specularColor * specularCoefficient);
 	}
 
-	if (!isTerrain && !isSkybox) {
-		gl_Color = texture(tex, textureVS) * (ambient + diffuseColor * diffuse + specularColor * specularCoefficient);
-	}
+	vec4 textureColor = texture(tex, textureVS) + color;
+	gl_Color = textureColor * totalLight;
 
-	if (isSkybox) {
-		gl_Color = texture(cubeMap, fragment);
-	}
 
 	// Fade far away objects
-	float camDistance = length(viewPositionVS - fragmentVS);
-	float distanceStartFade = 100;
-	float distanceEndFade = 1000;
-	if (camDistance > distanceStartFade && !isSkybox) {
+	// float camDistance = length(viewPositionVS - fragmentVS);
+	// float distanceStartFade = 100;
+	// float distanceEndFade = 1000;
+	// if (camDistance > distanceStartFade) {
 	//	float saturation = clamp((camDistance - distanceStartFade) / (distanceEndFade - distanceStartFade), 0, 1);
 	//	gl_Color = vec4(saturate(gl_Color.xyz, 1 - saturation), 1);
 	//	gl_Color = mix(gl_Color, vec4(0.27, 0.43, 0.66, 1), saturation);
-	}
+	// }
 	
 	gl_Color.w = dissolve;
 }

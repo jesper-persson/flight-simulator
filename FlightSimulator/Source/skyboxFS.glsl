@@ -7,5 +7,6 @@ in vec3 fragmentVS;
 out vec4 gl_Color;
 
 void main() {
-	gl_Color = texture(cubeMap, fragmentVS);
+	vec4 ambient = vec4(0.8, 0.8, 0.8,1 );
+	gl_Color = texture(cubeMap, fragmentVS) * ambient;
 }
