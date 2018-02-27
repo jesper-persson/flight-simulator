@@ -42,7 +42,7 @@ vec4 calculateLight(Light light, vec3 diffuse, vec3 specular, vec3 fragment, vec
 		float lambda = acos(dot(lightToFragment, light.direction)); // Current fragment "angle"
 		float outerCutoffAngle = light.cutoffAngle + 0.02;
 		if (lambda >= light.cutoffAngle) {
-			attenuation = (outerCutoffAngle - lambda) / (outerCutoffAngle - light.cutoffAngle);
+			attenuation = (outerCutoffAngle - lambda) / (outerCutoffAngle - light.cutoffAngle) * attenuation;
 		}
 		if (lambda > outerCutoffAngle) {
 			attenuation = 0;
@@ -59,5 +59,8 @@ vec4 calculateLight(Light light, vec3 diffuse, vec3 specular, vec3 fragment, vec
 	float specularIntensity = pow(cosAngle, specularExponent) * attenuation * light.intensity;
 
 	vec3 result = diffuseIntensity * light.color * diffuse + specularIntensity * light.color * specular;
+
+	result = clamp(result, 0, 1);
+
 	return vec4(result, 1);
 }
