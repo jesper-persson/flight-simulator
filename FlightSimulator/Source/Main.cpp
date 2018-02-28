@@ -150,8 +150,46 @@ void runPhysics(Entity &entity, float dt) {
 float getHeightAt(float *heightmap, int size, float tileSize, float positionX, float positionZ) {
 	int tileX = positionX / tileSize;
 	int tileZ = positionZ / tileSize;
-	float height = heightmap[tileZ * size + tileX];
-	return height;
+
+	// Find the four corners of the grid
+	glm::vec3 topLeftCorner = glm::vec3(tileX * tileSize, heightmap[tileX + tileZ * size], tileZ * tileSize);
+	glm::vec3 bottomRightCorner = glm::vec3((tileX + 1) * tileSize, heightmap[tileX + (tileZ + 1) * size + 1], (tileZ + 1) * tileSize);
+	glm::vec3 topRightCorner = glm::vec3((tileX + 1) * tileSize, heightmap[tileX + tileZ * size + 1], tileZ * tileSize);
+	glm::vec3 bottomLeftCorner = glm::vec3(tileX  * tileSize, heightmap[tileX + (tileZ + 1) * size], (tileZ + 1) * tileSize);
+
+	// Calculate tile penetration
+	float tilePenetrationX = ((int)(positionX * 100) % (int)(tileSize * 100)) / (tileSize * 100);
+	float tilePenetrationZ = ((int)(positionZ * 100) % (int)(tileSize * 100)) / (tileSize * 100);
+
+	float calculatedY;
+	// Check if top left triangle
+	if (tilePenetrationX <= 1 - tilePenetrationZ) {
+		glm::vec3 one = topLeftCorner;
+		glm::vec3 two = topRightCorner;
+		glm::vec3 three = bottomLeftCorner;
+		GLfloat lambda1N = ((two.z - three.z)*(positionX - three.x) + (three.x - two.x)*(positionZ - three.z));
+		GLfloat lambda1D = ((two.z - three.z)*(one.x - three.x) + (three.x - two.x)*(one.z - three.z));
+		GLfloat lambda1 = lambda1N / lambda1D;
+		GLfloat lambda2N = ((three.z - one.z)*(positionX - three.x) + (one.x - three.x)*(positionZ - three.z));
+		GLfloat lambda2D = ((two.z - three.z)*(one.x - three.x) + (three.x - two.x)*(one.z - three.z));
+		GLfloat lambda2 = lambda2N / lambda2D;
+		GLfloat lambda3 = 1 - lambda1 - lambda2;
+		calculatedY = one.y * lambda1 + two.y * lambda2 + three.y * lambda3;
+	} else {
+		glm::vec3 one = bottomRightCorner;
+		glm::vec3 two = topRightCorner;
+		glm::vec3 three = bottomLeftCorner;
+		GLfloat lambda1N = ((two.z - three.z)*(positionX - three.x) + (three.x - two.x)*(positionZ - three.z));
+		GLfloat lambda1D = ((two.z - three.z)*(one.x - three.x) + (three.x - two.x)*(one.z - three.z));
+		GLfloat lambda1 = lambda1N / lambda1D;
+		GLfloat lambda2N = ((three.z - one.z)*(positionX - three.x) + (one.x - three.x)*(positionZ - three.z));
+		GLfloat lambda2D = ((two.z - three.z)*(one.x - three.x) + (three.x - two.x)*(one.z - three.z));
+		GLfloat lambda2 = lambda2N / lambda2D;
+		GLfloat lambda3 = 1 - lambda1 - lambda2;
+		calculatedY = one.y * lambda1 + two.y * lambda2 + three.y * lambda3;
+	}
+
+	return calculatedY;
 }
 
 // Should also interpolate over triangle
@@ -541,7 +579,7 @@ int main() {
 
 	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
 	float *heightmapData = new float[size * size];
-	diamondSquare(heightmapData, size,  0.3f, seed);
+	diamondSquare(heightmapData, size, smothness, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
 	const int numSubdivisions = 2;
 
