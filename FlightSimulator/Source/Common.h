@@ -8,6 +8,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+// Use this to generate smaller worlds, lower textures and such to reduce launch time
+const bool FAST_MODE = true;
+
 const glm::vec3 DEFAULT_FORWARD = glm::vec3(0, 0, 1);
 const glm::vec3 DEFAULT_UP = glm::vec3(0, 1, 0);
 

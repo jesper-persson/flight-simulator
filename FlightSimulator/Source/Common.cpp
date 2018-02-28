@@ -57,22 +57,26 @@ Model heightmapToModel(float *heightmap, int width, int height, float scaleX, fl
 				normals.get()[(z * width + x) * 3 + 1] = 1;
 				normals.get()[(z * width + x) * 3 + 2] = 0;
 			} else {
-				glm::vec3 ab = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
-				glm::vec3 ac = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
+				glm::vec3 a = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ);
+				glm::vec3 ab = a - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
+				glm::vec3 ac = a - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
 				glm::vec3 normal1 = glm::normalize(glm::cross(ac, ab));
-				//glm::vec3 ad = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
-				//glm::vec3 ae = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
-				//glm::vec3 normal2 = glm::normalize(glm::cross(ae, ad));
-				//glm::vec3 af = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
-				//glm::vec3 ag = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
-				//glm::vec3 normal3 = glm::normalize(glm::cross(af, ag));
-				//glm::vec3 ah = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
-				//glm::vec3 ai = glm::vec3(x * scaleX, heightmap[width * z + x] * scaleY, z * scaleZ) - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
-				//glm::vec3 normal4 = glm::normalize(glm::cross(ah, ai));
-				//glm::vec3 normal = glm::normalize(normal1 + normal2 + normal3 + normal4);
-				normals.get()[(z * width + x) * 3] = normal1.x;
-				normals.get()[(z * width + x) * 3 + 1] = normal1.y;
-				normals.get()[(z * width + x) * 3 + 2] = normal1.z;
+				glm::vec3 normal = normal1;
+				if (!FAST_MODE) {
+					glm::vec3 ad = a - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
+					glm::vec3 ae = a - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
+					glm::vec3 normal2 = glm::normalize(glm::cross(ae, ad));
+					glm::vec3 af = a - glm::vec3((x - 1) * scaleX, heightmap[width * z + x - 1] * scaleY, z * scaleZ);
+					glm::vec3 ag = a - glm::vec3(x * scaleX, heightmap[width * (z + 1) + x] * scaleY, (z + 1) * scaleZ);
+					glm::vec3 normal3 = glm::normalize(glm::cross(af, ag));
+					glm::vec3 ah = a - glm::vec3((x + 1) * scaleX, heightmap[width * z + x + 1] * scaleY, z * scaleZ);
+					glm::vec3 ai = a - glm::vec3(x * scaleX, heightmap[width * (z - 1) + x] * scaleY, (z - 1) * scaleZ);
+					glm::vec3 normal4 = glm::normalize(glm::cross(ah, ai));
+					normal = glm::normalize(normal1 + normal2 + normal3 + normal4);
+				}
+				normals.get()[(z * width + x) * 3] = normal.x;
+				normals.get()[(z * width + x) * 3 + 1] = normal.y;
+				normals.get()[(z * width + x) * 3 + 2] = normal.z;
 			}
 
 			// Indices

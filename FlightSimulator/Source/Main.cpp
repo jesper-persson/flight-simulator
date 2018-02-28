@@ -182,12 +182,26 @@ GLuint createSkybox(std::string x1, std::string x2, std::string y1, std::string 
 	glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
 
 	std::vector<unsigned char> xPos = loadPNG(x1);
-	std::vector<unsigned char> xNeg = loadPNG(x2);
-	std::vector<unsigned char> yPos = loadPNG(y1);
-	std::vector<unsigned char> yNeg = loadPNG(y2);
-	std::vector<unsigned char> zPos = loadPNG(z1);
-	std::vector<unsigned char> zNeg = loadPNG(z2);
+	std::vector<unsigned char> xNeg;
+	std::vector<unsigned char> yPos;
+	std::vector<unsigned char> yNeg;
+	std::vector<unsigned char> zPos;
+	std::vector<unsigned char> zNeg;
 	const int size = 2048; // Should be returned from loader
+
+	if (FAST_MODE) {
+		xNeg = xPos;
+		yPos = xPos;
+		yNeg = xPos;
+		zPos = xPos;
+		zNeg = xPos;
+	} else {
+		xNeg = loadPNG(x2);
+		yPos = loadPNG(y1);
+		yNeg = loadPNG(y2);
+		zPos = loadPNG(z1);
+		zNeg = loadPNG(z2);
+	}
 
 	glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &xPos[0]);
 	glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &xNeg[0]);
@@ -515,12 +529,19 @@ int main() {
 	GLuint skyboxShader = getShader("Source/skyboxVS.glsl", "Source/skyboxFS.glsl");
 	GLuint terrainShader = getShader("Source/terrainVS.glsl", "Source/terrainFS.glsl");
 
-	const int size = 257;
-	const int tileSizeXZ = 10;
-	const int tileSizeY = 1;
+	int size = 2049;
+	int tileSizeXZ = 2;
+	int tileSizeY = 1;
+	float smothness = 0.3f;
+	if (FAST_MODE) {
+		size = 129;
+		tileSizeXZ = 10;
+		smothness = 1;
+	}
+
 	time_t seed = 1519128009; // Splat map is built after this seed, so don't change it
 	float *heightmapData = new float[size * size];
-	diamondSquare(heightmapData, size, 1.3f, seed);
+	diamondSquare(heightmapData, size,  0.3f, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
 	const int numSubdivisions = 2;
 
@@ -556,8 +577,14 @@ int main() {
 	skybox.setModel(getVAOCube());
 	skybox.scale = glm::vec3(20, 20, 20);
 	skybox.position = glm::vec3(0, -10, 0);
-	skybox.textureId = createSkybox("Resources/skybox-x-.png", "Resources/skybox-x+.png", "Resources/skybox-y+.png", "Resources/skybox-y-.png", "Resources/skybox-z-.png", "Resources/skybox-z+.png");
-	GLuint secondSkybox = createSkybox("Resources/skybox-night-x-.png", "Resources/skybox-night-x+.png", "Resources/skybox-night-y+.png", "Resources/skybox-night-y-.png", "Resources/skybox-night-z-.png", "Resources/skybox-night-z+.png");
+	GLuint secondSkybox;
+	if (FAST_MODE) {
+		skybox.textureId = createSkybox("Resources/skybox-x-.png", "Resources/skybox-x+.png", "Resources/skybox-y+.png", "Resources/skybox-y-.png", "Resources/skybox-z-.png", "Resources/skybox-z+.png");
+		secondSkybox = skybox.textureId;
+	} else {
+		skybox.textureId = createSkybox("Resources/skybox-x-.png", "Resources/skybox-x+.png", "Resources/skybox-y+.png", "Resources/skybox-y-.png", "Resources/skybox-z-.png", "Resources/skybox-z+.png");
+		secondSkybox = createSkybox("Resources/skybox-night-x-.png", "Resources/skybox-night-x+.png", "Resources/skybox-night-y+.png", "Resources/skybox-night-y-.png", "Resources/skybox-night-z-.png", "Resources/skybox-night-z+.png");
+	}
 	
 
 	Entity cube = Entity();
