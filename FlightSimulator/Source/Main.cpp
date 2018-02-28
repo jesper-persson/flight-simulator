@@ -313,9 +313,11 @@ GLuint getShader(std::string vertexShaderPath, std::string fragmentShaderPath) {
 	return program;
 }
 
+int steerMode = 0;
 glm::vec3 cameraPosition = glm::vec3(10, 10, 10);
 glm::vec3 cameraForward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+Entity *entityToFollow = nullptr;
 bool isForward, isBackward, isLeft, isUp, isRight, isDown, isStrideLeft, isStrideRight, jump, isShift;
 
 void basicSteering(glm::vec3 &position, glm::vec3 &forward, glm::vec3 &up) {
@@ -383,6 +385,14 @@ void interpolateCamera(glm::vec3 &targetPosition, glm::vec3 &cameraPosition) {
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (key == GLFW_KEY_I && action == GLFW_PRESS) {
+		steerMode++;
+		if (steerMode == 3) {
+			steerMode = 0;
+		}
+	}
+
+
 	if (key == GLFW_KEY_LEFT_SHIFT) {
 		handleKeyChange(&isShift, action);
 	}
@@ -623,6 +633,26 @@ int main() {
 		skybox.textureId = createSkybox("Resources/skybox-x-.png", "Resources/skybox-x+.png", "Resources/skybox-y+.png", "Resources/skybox-y-.png", "Resources/skybox-z-.png", "Resources/skybox-z+.png");
 		secondSkybox = createSkybox("Resources/skybox-night-x-.png", "Resources/skybox-night-x+.png", "Resources/skybox-night-y+.png", "Resources/skybox-night-y-.png", "Resources/skybox-night-z-.png", "Resources/skybox-night-z+.png");
 	}
+
+	Entity player = Entity();
+	player.setModel(getVAOCube());
+	player.scale = glm::vec3(0.1, 0.4, 0.1);
+	player.position = glm::vec3(10, 100, 10);
+	player.getModel().color = glm::vec4(0.7f, 0.84f, 0.54f, 1.0f);
+	player.centerToGroundContactPoint = -0.4f;
+
+	Light pointLight44 = Light();
+	pointLight44.setParentEntity(&player);
+	pointLight44.lightType = LightType::POINT_LIGHT;
+	pointLight44.attenuationC1 = 0.1;
+	pointLight44.attenuationC2 = 0.1;
+	pointLight44.color = glm::vec3(0.1, 1, 0.5);
+	pointLight44.intensity = 3;
+	Model pointLightModel44 = getVAOCube();
+	pointLightModel44.color = glm::vec4(pointLight44.color.x, pointLight44.color.y, pointLight44.color.z, 1);
+	pointLight44.setModel(pointLightModel44);
+	pointLight44.position = glm::vec3(0, 1.2, 0);
+	pointLight44.scale = glm::vec3(0.05, 0.05, 0.05);
 	
 
 	Entity cube = Entity();
@@ -691,7 +721,8 @@ int main() {
 	lights[1] = spotlight;
 	lights[2] = pointLight;
 	lights[3] = pointLight2;
-	int numLights = 4;
+	lights[4] = pointLight44;
+	int numLights = 5;
 
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -704,16 +735,30 @@ int main() {
 
 	float lastTime = glfwGetTime();
 	float currentTime;
+
+	
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		float currentTime = glfwGetTime();
 		float dt = currentTime - lastTime;
 		lastTime = currentTime;
-		//basicSteering(cameraPosition, cameraForward, cameraUp);
 
-		steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
-		airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+		if (steerMode == 0) { // Camera
+			basicSteering(cameraPosition, cameraForward, cameraUp);
+			entityToFollow = nullptr;
+		} else if (steerMode == 1) { // Airplane
+			steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+			airplanePhysics(*airplane[0], *airplane[18], *airplane[2], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
+			entityToFollow = airplane[0];
+		} else if (steerMode == 2) { // Player
+			entityToFollow = &player;
+			basicSteering(player.position, player.forward, player.up);
+		}
+
+		
 		terrainCollision(heightmapData, size, tileSizeXZ, *airplane[0]);
+		runPhysics(player, dt);
+		terrainCollision(heightmapData, size, tileSizeXZ, player);
 
 		for (int i = 0; i < numLights; i++) {
 			if (lights[i].getParentEntity()) {
@@ -723,12 +768,17 @@ int main() {
 			terrainCollision(heightmapData, size, tileSizeXZ, lights[i]);
 		}
 
-		// Normal camera
+		// Camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
-
-		glm::vec3 targetPosition = airplane[0]->position + -airplane[0]->forward * 2.5f;
-		interpolateCamera(targetPosition, cameraPosition);
-		cam = glm::lookAt(cameraPosition, airplane[0]->position, airplane[0]->up);
+		if (entityToFollow) {
+			glm::vec3 targetPosition = entityToFollow->position + -entityToFollow->forward * 2.5f;
+			interpolateCamera(targetPosition, cameraPosition);
+			float terrainHeightAtCamera = getHeightAt(heightmapData, size, tileSizeXZ, cameraPosition.x, cameraPosition.z);
+			if (cameraPosition.y <= terrainHeightAtCamera + 0.05f) {
+				cameraPosition.y = terrainHeightAtCamera + 0.05f;
+			}
+			cam = glm::lookAt(cameraPosition, entityToFollow->position, entityToFollow->up);
+		}
 
 		lights[3].position.x = 100 * sin(glfwGetTime() / (float)10) + 400;
 		lights[3].position.z = 100 * cos(glfwGetTime() / (float)10) + 400;
@@ -762,6 +812,7 @@ int main() {
 			}
 			renderEntity(*airplane[i], modelShader, cam, perspective, true);
 		}
+		renderEntity(player, modelShader, cam, perspective, true);
 		renderEntity(*airplane[0], modelShader, cam, perspective, true);
 		renderEntity(*airplane[8], modelShader, cam, perspective, true);
 		renderEntity(cube, modelShader, cam, perspective, true);
