@@ -57,16 +57,19 @@ void steerAirplane(Entity &main, Entity &aileronLeft, Entity &aileronRight, Enti
 			rotateEntity(rightFlap, rotAxis, -(float)pitch*maxAnglePitch);
 		}
 	}
+
+	float maxThrustForce = 40000; // Newtons
+	float maxBreakForce = 2000; // Newtons
+	glm::vec3 thrustForce = main.forward * (float)thrust * (thrust == 1 ? maxThrustForce : maxBreakForce);
+	main.impulse = thrustForce;
 }
 
 // dt in seconds
 // assumes 1 distance unit in the game is 1 meter
-void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, int thrust, int roll, int pitch, float dt) {
+void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, float dt) {
 	float mass = 1000;
 	float gravitationalAcceleration = 9.82f;
-	float maxThrustForce = 40000; // Newtons
-	float maxBreakForce = 2000; // Newtons
-	float airResistanceConstant = 4; // Includes density and area
+	float airResistanceConstant = 20; // Includes density and area
 	float liftConstant = 160;
 
 	glm::vec3 &up = entity.up;
@@ -74,7 +77,8 @@ void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, int 
 	glm::vec3 &velocity = entity.velocity;
 	glm::vec3 &position = entity.position;
 
-	glm::vec3 thrustForce = forward * (float)thrust * (thrust == 1 ? maxThrustForce : maxBreakForce);
+	glm::vec3 thrustForce = entity.impulse;
+	entity.impulse = glm::vec3(0, 0, 0);
 	
 	glm::vec3 airResitance = glm::vec3(0, 0, 0);
 	if (glm::length(velocity) > 0) {
@@ -111,5 +115,16 @@ void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, int 
 	velocity = velocity + acceleration * dt;
 	position = position + velocity * dt;
 
-	std::cout << "Velocity: " << glm::length(velocity) << " m/s" << std::endl;
+	//std::cout << "Velocity: " << glm::length(velocity) << " m/s" << std::endl;
+}
+
+void normalPhysics(Entity &entity, float dt) {
+	float mass = 1000;
+	float gravitationalAcceleration = 9.82f;
+	glm::vec3 gravity = glm::vec3(0, -mass * gravitationalAcceleration, 0);
+	glm::vec3 airResistance = -glm::normalize(entity.velocity) * glm::length(entity.velocity) * glm::length(entity.velocity) * 520.0f;
+	glm::vec3 netForce = gravity + airResistance;
+	glm::vec3 acceleration = netForce / mass;
+	entity.velocity = entity.velocity + acceleration * dt;
+	entity.position = entity.position + entity.velocity * dt;
 }
