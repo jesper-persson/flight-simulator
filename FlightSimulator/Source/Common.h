@@ -181,7 +181,7 @@ public:
 	Particle *particles;
 };
 
-void updateParticleSystem(ParticleSystem &particleSystem, float dt);
+void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection);
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt);
 
 std::string readFile(std::string path);

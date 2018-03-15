@@ -1,6 +1,7 @@
 #include "Common.h"
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
+#include <algorithm>
 
 #include <fstream>
 #include <iostream>
@@ -616,7 +617,34 @@ glm::vec3 generateParticleDirection(float theta, float phi, float angleInterval)
 	return direction;
 }
 
-void updateParticleSystem(ParticleSystem &particleSystem, float dt) {
+void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPosition, glm::vec3 cameraForward) {
+	if (numParticles == 0) {
+		return;
+	}
+	std::pair<Particle, float> *z = new std::pair<Particle, float>[numParticles];
+
+	Particle *particleIterator = particle;
+	for (int i = 0; i < numParticles; i++) {
+		float distance = glm::length(glm::dot(particleIterator->position - cameraPosition, cameraForward));
+		z[i].first = *particleIterator;
+		z[i].second = distance;
+		particleIterator++;
+	}
+	
+	std::pair<Particle, float> *last = &z[numParticles - 1];
+	std::sort(z, last, [](std::pair<Particle, float> const &a, std::pair<Particle, float> const  &b) -> bool {
+		return a.second > b.second;
+	});
+
+	particleIterator = particle;
+	for (int i = 0; i < numParticles; i++) {
+		particle[i] = z[i].first;
+	}
+
+	delete z;
+}
+
+void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection) {
 	for (int i = 0; i < particleSystem.numParticles; i++) {
 		updateParticle(particleSystem, particleSystem.particles[i], dt);
 		if (particleSystem.particles[i].timeAlive >= particleSystem.particles[i].lifetime) {
@@ -644,6 +672,8 @@ void updateParticleSystem(ParticleSystem &particleSystem, float dt) {
 		particleSystem.numParticles += 1;
 		particleSystem.timeSinceLastSpawn = 0;
 	}
+
+	sortParticles(particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection);
 }
 
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt) {

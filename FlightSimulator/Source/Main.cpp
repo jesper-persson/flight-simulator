@@ -162,7 +162,7 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 	LARGE_INTEGER startingTime, endingTime, elapsedMicroseconds;
 	LARGE_INTEGER frequency;
 
-	float size = .5f;
+	float size = 0.2f;
 	float trans[] = {
 		size, 0, 0, 0,
 		0, size, 0, 0,
@@ -182,7 +182,7 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 	glBindTexture(GL_TEXTURE_2D, particle->textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-	glDisable(GL_DEPTH_TEST);
+	//glDisable(GL_DEPTH_TEST);
 
 	std::string uniformNameProgress = std::string("atlasSize");
 	glUniform1i(glGetUniformLocation(shaderProgram, uniformNameProgress.c_str()), 8);
@@ -191,7 +191,7 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 		transglm[3][1] = particle->position.y;
 		transglm[3][2] = particle->position.z;
 
-		glm::mat4 trans = transglm * scale * cameraRotation;
+		glm::mat4 trans = transglm * scale *cameraRotation;
 
 		glUniformMatrix4fv(uniformLocationsTransformation[i], 1, GL_FALSE, glm::value_ptr(trans)); // &trans[0]);
 		glUniform4f(uniformLocationsColor[i], particle->color.x, particle->color.y, particle->color.z, particle->color.w);
@@ -762,18 +762,18 @@ int program() {
 	Model particleModel = getVAOQuad();
 	ParticleSystem smoke = ParticleSystem(40000);
 	smoke.model = particleModel;
-	smoke.position = glm::vec3(17, 77.8, 43);
-	smoke.particlesPerSecond = 3;
+	smoke.position = glm::vec3(17, 78, 43);
+	smoke.particlesPerSecond = 60;
 	smoke.timeSinceLastSpawn = 0;
-	smoke.direction = glm::normalize(glm::vec3(0, 1, 0));
-	smoke.spreadAngle = 0.15f;
+	smoke.direction = glm::normalize(glm::vec3(1, 0, 0));
+	smoke.spreadAngle = 0.65f;
 	smoke.minLifetime = 1.0f;
 	smoke.maxLifetime = 6.2f;
 	smoke.textureId = loadPNGTexture("Resources/particle-atlas.png");
 	smoke.atlasSize = 9;
 	smoke.startColor = glm::vec4(1, 0, 0, 1);
 	smoke.endColor = glm::vec4(1, 1, 0, 0);
-	smoke.velocity = 0.05f;
+	smoke.velocity = 0.55f;
 
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -871,6 +871,7 @@ int program() {
 			if (cameraPosition.y <= terrainHeightAtCamera + 0.05f) {
 				cameraPosition.y = terrainHeightAtCamera + 0.05f;
 			}
+			cameraForward = glm::normalize(entityToFollow->position - cameraPosition);
 			cam = glm::lookAt(cameraPosition, entityToFollow->position, entityToFollow->up);
 		}
 
@@ -922,7 +923,7 @@ int program() {
 		//smoke.direction = glm::vec3(0, 0, -1);
 		//glm::mat4 parentTransformation = getEntityTransformation(*airplane[0]); 
 		glm::mat4 parentTransformation = glm::translate(glm::mat4(), glm::vec3(0, 0, 0));
-		updateParticleSystem(smoke, dt);
+		updateParticleSystem(smoke, dt, cameraPosition, cameraForward);
 		if (smoke.numParticles > 0) {
 			renderParticles(smoke.particles, smoke.numParticles, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderColor, parentTransformation, cam, perspective);
 		}
