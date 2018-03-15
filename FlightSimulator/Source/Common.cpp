@@ -15,6 +15,9 @@
 
 #include <memory>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
@@ -325,6 +328,67 @@ void rotateEntity(Entity &entity, glm::vec3 axis, float amount) {
 	entity.forward = glm::normalize(glm::rotate(entity.forward, amount, axis));
 }
 
+Model getVAOQuad() {
+	GLuint vao = 0;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	float vertexData[] = {
+		-1, -1, 0,
+		-1, 1, 0,
+		1, -1, 0,
+		1, 1, 0,
+		1, -1, 0,
+		-1, 1, 0,
+	};
+
+	GLfloat normalData[] = {
+		0, 0, 1, 0, 0, 1
+	};
+
+	GLfloat textureData[] = {
+		0, 0, 0, 1, 1, 0,
+		1, 1, 1, 0, 0, 1,
+	};
+
+	GLuint indexData[] = {
+		0, 1, 2, 3, 4, 5
+	};
+
+	GLuint vertexBuffer = 0;
+	glGenBuffers(1, &vertexBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 6, vertexData, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	GLuint normalBuffer = 0;
+	glGenBuffers(1, &normalBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
+	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(GLfloat) * 6, normalData, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+
+	GLuint textureBuffer = 0;
+	glGenBuffers(1, &textureBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, textureBuffer);
+	glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(GLfloat) * 6, textureData, GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(2);
+
+	GLuint indexBuffer = 0;
+	glGenBuffers(1, &indexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 6, indexData, GL_STATIC_DRAW);
+
+	Model model = Model();
+	model.vao = vao;
+	model.offset = 0;
+	model.numIndices = 6;
+
+	return model;
+}
+
 Model getVAOCube() {
 	GLuint vao = 0;
 	glGenVertexArrays(1, &vao);
@@ -528,4 +592,71 @@ GLuint loadPNGTexture(std::string filename) {
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageCopy[0]);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	return texId;
+}
+
+// Paramater theta and phi denote a point on the unit sphere where theta = 0 and phi = 0 denote the point (1, 0, 0).
+// Theta should be [0, 2*pi)
+// Phi should be [-pi/2, pi/2]
+// angleInterval is the total interval for points to be generated around phi and theta.
+glm::vec3 generateParticleDirection(float theta, float phi, float angleInterval) {
+	float accuracyFactor = 100;
+
+	float thetaUpperBound = theta + angleInterval / 2;
+	float thetaLowerBound = theta - angleInterval / 2;
+	float phiUpperBound = phi + angleInterval / 2;
+	float phiLowerBound = phi - angleInterval / 2;
+
+	float genTheta = (random(0, (thetaUpperBound - thetaLowerBound) * accuracyFactor) + thetaLowerBound * accuracyFactor) / accuracyFactor;
+	float genPhi = (random(0, (phiUpperBound - phiLowerBound) * accuracyFactor) + phiLowerBound * accuracyFactor) / accuracyFactor; // -(phiUpperBound - phiLowerBound) * accuracyFactor) / accuracyFactor;
+
+	glm::vec3 direction = glm::vec3(0, 0, 0);
+	direction.x = cos(genTheta) * cos(genPhi);
+	direction.z = sin(genTheta) * cos(genPhi);
+	direction.y = sin(genPhi);
+	return direction;
+}
+
+void updateParticleSystem(ParticleSystem &particleSystem, float dt) {
+	for (int i = 0; i < particleSystem.numParticles; i++) {
+		updateParticle(particleSystem, particleSystem.particles[i], dt);
+		if (particleSystem.particles[i].timeAlive >= particleSystem.particles[i].lifetime) {
+			particleSystem.numParticles -= 1;
+			if (particleSystem.numParticles > 0) {
+				particleSystem.particles[i] = particleSystem.particles[particleSystem.numParticles];
+				i--;
+			}
+		}
+	}
+
+	particleSystem.timeSinceLastSpawn += dt;
+	int numParticlesToSpawn = (int)particleSystem.particlesPerSecond * particleSystem.timeSinceLastSpawn;
+	for (int i = 0; i < numParticlesToSpawn && particleSystem.numParticles < particleSystem.maxNumParticles; i++) {
+		Particle p = Particle(particleSystem.position, glm::vec3(0, 0, 0), glm::vec3(0.02f, 0.02f, 0.02f), 1.0f);
+		p.model = particleSystem.model;
+		p.lifetime = random(particleSystem.minLifetime * 100, particleSystem.maxLifetime * 100) / 100.0f;
+		p.color = particleSystem.startColor;
+		p.textureId = particleSystem.textureId;
+		float theta = atan2(particleSystem.direction.z, particleSystem.direction.x);
+		float phi = asin(particleSystem.direction.y);
+		
+		p.velocity = generateParticleDirection(theta, phi, particleSystem.spreadAngle) * particleSystem.velocity;
+		particleSystem.particles[particleSystem.numParticles] = p;
+		particleSystem.numParticles += 1;
+		particleSystem.timeSinceLastSpawn = 0;
+	}
+}
+
+void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt) {
+	particle.position = particle.position + particle.velocity * dt;
+	particle.timeAlive += dt;
+
+	float t = particle.timeAlive / particle.lifetime;
+	particle.color = particleSystem.endColor * t + (1 - t) * particleSystem.startColor;
+}
+
+int random(int min, int max) {
+	if (max - min == 0) {
+		return 0;
+	}
+	return (rand() % (max - min)) + min;
 }

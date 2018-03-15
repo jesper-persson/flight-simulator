@@ -6,7 +6,7 @@
 
 #define WORLD_TO_INDEX(x, y, width) ((y) * (width) + (x))
 
-int random(int min, int max) {
+static int random(int min, int max) {
 	if (max - min == 0) {
 		return 0;
 	}

@@ -23,6 +23,8 @@
 #include "Physics.h"
 #include "EntityFactory.h"
 
+const int NUM_PARTICLES_PER_DRAW_CALL = 100;
+
 glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp) {
 	assert(std::abs(glm::dot(forward, up)) <= 0.00001f, "Forward and up must be perpendicular");
 
@@ -139,6 +141,80 @@ void renderSkybox(Entity &skybox, GLuint secondSkyboxTexture, float interpolatio
 	glUniform1f(glGetUniformLocation(shaderProgram, "interpolation"), interpolation);
 	glDrawElements(GL_TRIANGLES, skybox.getModel().numIndices, GL_UNSIGNED_INT, (void*)0);
 	glEnable(GL_DEPTH_TEST);
+}
+
+void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram, int uniformLocationsTransformation[], int uniformLocationsColor[], glm::mat4 &parent, glm::mat4 &worldToView, glm::mat4 &perspective) {
+	glUseProgram(shaderProgram);
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parent));
+
+	// Extract camera rotation from worldToView
+	glm::mat4 cameraRotation = glm::inverse(worldToView);
+	cameraRotation[3][0] = 0;
+	cameraRotation[3][1] = 0;
+	cameraRotation[3][2] = 0;
+	cameraRotation[3][3] = 1;
+	
+	int numIndices = particle->model.numIndices;
+	int i = 0;
+
+	LARGE_INTEGER startingTime, endingTime, elapsedMicroseconds;
+	LARGE_INTEGER frequency;
+
+	float size = .5f;
+	float trans[] = {
+		size, 0, 0, 0,
+		0, size, 0, 0,
+		0, 0, size, 0,
+		0, 0, 0, 1,
+	};
+
+	glm::mat4 transglm = glm::translate(glm::mat4(), glm::vec3(0, 0, 0));
+	glm::mat4 scale = glm::scale(glm::mat4(), glm::vec3(size, size, size));
+	glm::quat quaternion = directionToQuaternion(glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), DEFAULT_FORWARD, DEFAULT_UP);
+	glm::mat4 rotation = glm::toMat4(quaternion);
+
+	QueryPerformanceFrequency(&frequency);
+	QueryPerformanceCounter(&startingTime);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, particle->textureId);
+	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	glDisable(GL_DEPTH_TEST);
+
+	std::string uniformNameProgress = std::string("atlasSize");
+	glUniform1i(glGetUniformLocation(shaderProgram, uniformNameProgress.c_str()), 8);
+	for (int j = 0; j < numParticles; i++, j++) {
+		transglm[3][0] = particle->position.x;
+		transglm[3][1] = particle->position.y;
+		transglm[3][2] = particle->position.z;
+
+		glm::mat4 trans = transglm * scale * cameraRotation;
+
+		glUniformMatrix4fv(uniformLocationsTransformation[i], 1, GL_FALSE, glm::value_ptr(trans)); // &trans[0]);
+		glUniform4f(uniformLocationsColor[i], particle->color.x, particle->color.y, particle->color.z, particle->color.w);
+
+		std::string uniformNameProgress = std::string("progress[") + std::to_string(i) + std::string("]");
+		glUniform1f(glGetUniformLocation(shaderProgram, uniformNameProgress.c_str()), particle->timeAlive / particle->lifetime);
+		particle++;
+
+		if (i >= NUM_PARTICLES_PER_DRAW_CALL - 1) {
+			glDrawElementsInstanced(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, 0, i);
+			i = 0;
+		}
+	}
+
+	if (i > 0) {
+		glDrawElementsInstanced(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, 0, i);
+	}
+
+	QueryPerformanceCounter(&endingTime);
+	elapsedMicroseconds.QuadPart = endingTime.QuadPart - startingTime.QuadPart;
+	elapsedMicroseconds.QuadPart *= 1000000;
+	elapsedMicroseconds.QuadPart /= frequency.QuadPart;
+	//std::cout << elapsedMicroseconds.QuadPart << std::endl;
 }
 
 void runPhysics(Entity &entity, float dt) {
@@ -584,6 +660,15 @@ int program() {
 	GLuint modelShader = getShader("Source/modelVS.glsl", "Source/modelFS.glsl");
 	GLuint skyboxShader = getShader("Source/skyboxVS.glsl", "Source/skyboxFS.glsl");
 	GLuint terrainShader = getShader("Source/terrainVS.glsl", "Source/terrainFS.glsl");
+	GLuint instancedShader = getShader("Source/instancedVS.glsl", "Source/instancedFS.glsl");
+	int uniformLocationInstanceShaderTransformation[NUM_PARTICLES_PER_DRAW_CALL];
+	int uniformLocationInstanceShaderColor[NUM_PARTICLES_PER_DRAW_CALL];
+	for (int i = 0; i < NUM_PARTICLES_PER_DRAW_CALL; i++) {
+		std::string uniformName = std::string("modelToWorld[") + std::to_string(i) + std::string("]");
+		std::string uniformNameColor = std::string("color[") + std::to_string(i) + std::string("]");
+		uniformLocationInstanceShaderTransformation[i] = glGetUniformLocation(instancedShader, uniformName.c_str());
+		uniformLocationInstanceShaderColor[i] = glGetUniformLocation(instancedShader, uniformNameColor.c_str());
+	}
 
 	int size = 2049;
 	int tileSizeXZ = 2;
@@ -599,13 +684,6 @@ int program() {
 	float *heightmapData = new float[size * size];
 	diamondSquare(heightmapData, size, smothness, seed);
 	makeRunwayOnHeightmap(heightmapData, size);
-	const int numSubdivisions = 2;
-
-	Entity *terrainEntities[numSubdivisions * numSubdivisions];
-	for (int x = 0; x < numSubdivisions; x++) {
-		for (int z = 0; z < numSubdivisions; z++) {
-		}
-	}
 
 	Model terrain = heightmapToModel(heightmapData, size, size, tileSizeXZ, tileSizeY, tileSizeXZ, 40 * tileSizeXZ);
 
@@ -619,7 +697,7 @@ int program() {
 	ground.setTextureId4(loadPNGTexture("Resources/terrain-splatmap.png"));
 
 	GLuint jasTexture = loadPNGTexture("Resources/jas.png");
-	GLuint jasNormalMap = loadPNGTexture("Resources/metal-normalmap.png");
+	GLuint jasNormalMap = loadPNGTexture("Resources/normalmap.png");
 	std::vector<Entity*> airplane = loadJAS39Gripen("Resources/jas.obj");
 	airplane[0]->position = glm::vec3(10, 10, 20);
 	airplane[0]->scale = glm::vec3(0.2f, 0.2f, 0.2f);
@@ -649,7 +727,6 @@ int program() {
 	cube.textureId = loadPNGTexture("Resources/grass512.png");
 	cube.normalMapId = loadPNGTexture("Resources/normalmap.png");
 
-
 	Entity player = Entity();
 	player.setModel(getVAOCube());
 	player.scale = glm::vec3(0.1, 0.4, 0.1);
@@ -678,10 +755,28 @@ int program() {
 	worldGreenMovingLight.centerToGroundContactPoint = -10;
 	lights.push_back(&worldGreenMovingLight);
 
+	Light fireLight = createPointLight(glm::vec3(17, 80, 43), glm::vec3(0.1, 0.1, 0.1), 20, 0.1, 0.1, glm::vec3(1, 1, 1));
+	lights.push_back(&fireLight);
+
+	// Particles
+	Model particleModel = getVAOQuad();
+	ParticleSystem smoke = ParticleSystem(40000);
+	smoke.model = particleModel;
+	smoke.position = glm::vec3(17, 77.8, 43);
+	smoke.particlesPerSecond = 3;
+	smoke.timeSinceLastSpawn = 0;
+	smoke.direction = glm::normalize(glm::vec3(0, 1, 0));
+	smoke.spreadAngle = 0.15f;
+	smoke.minLifetime = 1.0f;
+	smoke.maxLifetime = 6.2f;
+	smoke.textureId = loadPNGTexture("Resources/particle-atlas.png");
+	smoke.atlasSize = 9;
+	smoke.startColor = glm::vec4(1, 0, 0, 1);
+	smoke.endColor = glm::vec4(1, 1, 0, 0);
+	smoke.velocity = 0.05f;
+
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	//glEnable(GL_CULL_FACE);
 	//glFrontFace(GL_CW);
@@ -692,9 +787,13 @@ int program() {
 	float currentTime;
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		float currentTime = glfwGetTime();
 		float dt = currentTime - lastTime;
 		lastTime = currentTime;
+		std::string title = std::string("Frame time: ") + std::to_string(dt) + std::string(" micro seconds");
+		glfwSetWindowTitle(window, title.c_str());
 
 		if (steerMode == 0) { // Camera
 			basicSteering(cameraPosition, cameraForward, cameraUp);
@@ -704,7 +803,6 @@ int program() {
 				steerAirplane(*airplane[0], *airplane[18], *airplane[1], *airplane[2], *airplane[14], isForward ? 1 : (isBackward ? -1 : 0), isLeft ? 1 : (isRight ? -1 : 0), isDown ? 1 : (isUp ? -1 : 0), dt);
 				entityToFollow = airplane[0];
 			}
-			
 		} else if (steerMode == 2) { // Player
 			entityToFollow = &player;
 			basicSteering(player.position, player.forward, player.up);
@@ -712,7 +810,7 @@ int program() {
 
 		bool collision = getHeightAt(heightmapData, size, tileSizeXZ, airplane[0]->position.x, airplane[0]->position.z) >= airplane[0]->position.y - 0.2f;
 
-		if (!boom && collision && glm::length(airplane[0]->velocity) > 1) {
+		if (!boom && collision && glm::length(airplane[0]->velocity) > 20) {
 			std::cout << "BOOOOM!" << std::endl;
 			glm::vec3 velocity = airplane[0]->velocity;
 			for (std::vector<Entity*>::iterator iter = ++airplane.begin(); iter != airplane.end(); iter++) {
@@ -765,7 +863,7 @@ int program() {
 		}
 
 		// Camera
-		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 10.0f, cameraUp);
+		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 14.0f, cameraUp);
 		if (entityToFollow) {
 			glm::vec3 targetPosition = entityToFollow->position + -entityToFollow->forward * 2.5f * (boom ? 2.0f : 1.0f) + entityToFollow->up * 1.0f  * (boom ? 2.0f : 1.0f);
 			interpolateCamera(targetPosition, cameraPosition);
@@ -781,20 +879,25 @@ int program() {
 
 		airplaneWingLight.intensity = 4;
 		worldGreenMovingLight.intensity = 4 * sin(glfwGetTime() * 2) + 4;
-		if ((int)(glfwGetTime()*10) % 10 != 0) {
+		if ((int)(glfwGetTime() * 10) % 10 != 0) {
 			airplaneWingLight.intensity = 0;
 		}
 
 		// Animate sun (make sure direction always faces middle of ground
 		float centerPosition = (float)(size * tileSizeXZ) / 2.0f;
 		glm::vec3 center = glm::vec3(centerPosition, getHeightAt(heightmapData, size, tileSizeXZ, centerPosition, centerPosition), centerPosition);
-		float time = glfwGetTime() / 15000;
+		float time = glfwGetTime() / 1;// 5000;
 		sun.position.z = centerPosition;
 		sun.position.y = cos(time) * centerPosition * 2 + center.y;
 		sun.position.x = sin(time) * centerPosition * 2 + centerPosition;
 		sun.up = glm::vec3(0, 0, 1);
 		sun.forward = glm::normalize(center - sun.position);
 		float interpolation = (cos(time) + 1) / 2.0f;
+
+		// Animate fire light
+		if ((int)(glfwGetTime() * 100) % 4 == 3) {
+			fireLight.intensity = fireLight.intensity - (random(0, 8) - 4);
+		}
 
 		// Render entities
 		renderSkybox(skybox, secondSkybox, interpolation, skyboxShader, cam, perspective);
@@ -811,6 +914,18 @@ int program() {
 		renderEntity(*airplane[0], modelShader, cam, perspective, true);
 		renderEntity(*airplane[8], modelShader, cam, perspective, true);
 		renderEntity(cube, modelShader, cam, perspective, true);
+
+		// Particles
+		//glm::vec3 right = glm::normalize(glm::cross(airplane[0]->up, airplane[0]->forward));
+		//smoke.position = airplane[0]->position - airplane[0]->forward * 1.0f;// +right * 0.8f;
+		//smoke.position = glm::vec3(0, 0.15f, -6.5f);
+		//smoke.direction = glm::vec3(0, 0, -1);
+		//glm::mat4 parentTransformation = getEntityTransformation(*airplane[0]); 
+		glm::mat4 parentTransformation = glm::translate(glm::mat4(), glm::vec3(0, 0, 0));
+		updateParticleSystem(smoke, dt);
+		if (smoke.numParticles > 0) {
+			renderParticles(smoke.particles, smoke.numParticles, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderColor, parentTransformation, cam, perspective);
+		}
 
 		// Draw lights
 		for (int i = 0; i < lights.size(); i++) {

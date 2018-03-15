@@ -56,5 +56,7 @@
     <None Include="Source\terrainVS.glsl" />
     <None Include="Source\terrainFS.glsl" />
     <None Include="Source\common.glsl" />
+    <None Include="Source\instancedFS.glsl" />
+    <None Include="Source\instancedVS.glsl" />
   </ItemGroup>
 </Project>

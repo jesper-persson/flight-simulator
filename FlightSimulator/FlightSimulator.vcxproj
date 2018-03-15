@@ -138,6 +138,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\common.glsl" />
+    <None Include="Source\instancedFS.glsl" />
+    <None Include="Source\instancedVS.glsl" />
     <None Include="Source\modelFS.glsl" />
     <None Include="Source\skyboxFS.glsl" />
     <None Include="Source\skyboxVS.glsl" />

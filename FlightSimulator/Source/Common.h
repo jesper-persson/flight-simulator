@@ -126,6 +126,64 @@ public:
 	float attenuationC2;
 };
 
+class Particle {
+public:
+	Particle(glm::vec3 position, glm::vec3 velocity, glm::vec3 scale, float lifetime) {
+		this->position = position;
+		this->velocity = velocity;
+		this->scale = scale;
+		color = glm::vec4(1, 1, 1, 1);
+		timeAlive = 0;
+		this->lifetime = lifetime;
+	}
+	Particle() {
+
+	}
+	glm::vec3 position;
+	glm::vec3 velocity;
+	int textureId;
+	glm::vec4 color;
+	glm::vec3 scale;
+	Model model;
+	// Denotes the duration in seconds this particle has lived
+	float timeAlive;
+	// Denotes the duration in seconds this particle should live
+	float lifetime;
+};
+
+class ParticleSystem {
+public:
+	ParticleSystem(int maxNumParticles) {
+		this->maxNumParticles = maxNumParticles;
+		particles = new Particle[maxNumParticles];
+		velocity = 0;
+		timeSinceLastSpawn = 0;
+	}
+	~ParticleSystem() {
+		delete particles;
+	}
+	glm::vec3 direction;
+	glm::vec3 position;
+	float velocity;
+	glm::vec4 startColor;
+	glm::vec4 endColor;
+	// Angle from center
+	float spreadAngle;
+	Model model;
+	int textureId;
+	int atlasSize;
+	int particlesPerSecond;
+	int maxNumParticles;
+	int numParticles;
+	float timeSinceLastSpawn;
+	float minLifetime;
+	float maxLifetime;
+	Particle *particles;
+};
+
+void updateParticleSystem(ParticleSystem &particleSystem, float dt);
+void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt);
+
 std::string readFile(std::string path);
 
 Model heightmapToModel(float *heightmap, int width, int height, float scaleX, float scaleY, float scaleZ, float textureScale);
@@ -139,9 +197,12 @@ std::vector<Entity*> loadJAS39Gripen(std::string filename);
 void rotateEntity(Entity &entity, glm::vec3 axis, float amount);
 
 Model getVAOCube();
+Model getVAOQuad();
 
 void calculateTangents(float *vertexData, float *textureData, int numVertices, float *tangentData, float *bitangentData);
 
 GLuint loadPNGTexture(std::string filename);
+
+int random(int min, int max);
 
 #endif
