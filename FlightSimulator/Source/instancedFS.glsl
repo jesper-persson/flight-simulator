@@ -34,6 +34,6 @@ void main() {
 		interp = 1;
 	}
 	vec4 color = mix(sprite2, sprite1, interp);
-	gl_Color = color;
+	gl_Color = color * vec4(1.3,1,1.3,1);
 }
 

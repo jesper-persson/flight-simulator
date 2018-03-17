@@ -25,43 +25,6 @@
 
 const int NUM_PARTICLES_PER_DRAW_CALL = 100;
 
-glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp) {
-	assert(std::abs(glm::dot(forward, up)) <= 0.00001f, "Forward and up must be perpendicular");
-
-	glm::vec3 rotationAxis = glm::normalize(glm::cross(defaultForward, forward));
-	if (glm::dot(defaultForward, forward) > 0.99999f) {
-		rotationAxis = forward;
-	} else if (glm::dot(defaultForward, forward) < -0.99999f) {
-		rotationAxis = up;
-	}
-	float angle = acos(glm::dot(defaultForward, forward));
-	glm::highp_quat quatForward = glm::rotate(glm::quat(), angle, rotationAxis);
-
-	// Account for roll using up vector
-	glm::vec3 newUp = glm::normalize(quatForward * defaultUp);
-	float upAngle = acos(glm::dot(up, newUp));
-	if (glm::dot(newUp, up) > 0.99999f) {
-		return quatForward;
-	}
-	glm::highp_quat quatUp = glm::rotate(glm::quat(), upAngle, glm::normalize(glm::cross(newUp, up)));
-
-	return  quatUp * quatForward;
-}
-
-glm::mat4 getEntityTransformation(Entity &entity) {
-	glm::mat4 toPivot = glm::translate(glm::mat4(), -entity.getRotationPivot());
-	glm::mat4 translation = glm::translate(glm::mat4(), entity.position);
-	glm::mat4 scale = glm::scale(glm::mat4(), entity.scale);
-	glm::quat quaternion = directionToQuaternion(entity.forward, entity.up, DEFAULT_FORWARD, DEFAULT_UP);
-	glm::mat4 rotation = glm::toMat4(quaternion);
-	glm::mat4 transformation = translation * glm::inverse(toPivot) * rotation * toPivot * scale;
-	if (entity.getParentEntity()) {
-		return getEntityTransformation(*entity.getParentEntity()) * transformation;
-	} else {
-		return transformation;
-	}
-}
-
 void bindLight(GLuint shaderProgram, std::vector<Light*> lights) {
 	glUseProgram(shaderProgram);
 	for (int i = 0; i < lights.size(); i++) {
@@ -143,11 +106,17 @@ void renderSkybox(Entity &skybox, GLuint secondSkyboxTexture, float interpolatio
 	glEnable(GL_DEPTH_TEST);
 }
 
-void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram, int uniformLocationsTransformation[], int uniformLocationsColor[], glm::mat4 &parent, glm::mat4 &worldToView, glm::mat4 &perspective) {
+void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram, int uniformLocationsTransformation[], int uniformLocationsColor[], Entity &parentEntity, glm::mat4 &worldToView, glm::mat4 &perspective) {
 	glUseProgram(shaderProgram);
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
-	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parent));
+
+	glm::mat4 parentTransformation = getEntityTransformation(parentEntity);
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parentTransformation));
+
+	// Get rotation matrix for rotating back, from the rotation crated from parent transformation
+	glm::quat quaternion2 = directionToQuaternion(parentEntity.forward, parentEntity.up, DEFAULT_FORWARD, DEFAULT_UP);
+	glm::mat4 rotateBack = glm::inverse(glm::toMat4(quaternion2));
 
 	// Extract camera rotation from worldToView
 	glm::mat4 cameraRotation = glm::inverse(worldToView);
@@ -162,7 +131,7 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 	LARGE_INTEGER startingTime, endingTime, elapsedMicroseconds;
 	LARGE_INTEGER frequency;
 
-	float size = 0.2f;
+	float size = 0.55f;
 	float trans[] = {
 		size, 0, 0, 0,
 		0, size, 0, 0,
@@ -182,6 +151,7 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 	glBindTexture(GL_TEXTURE_2D, particle->textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//glDisable(GL_DEPTH_TEST);
 
 	std::string uniformNameProgress = std::string("atlasSize");
@@ -191,7 +161,7 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 		transglm[3][1] = particle->position.y;
 		transglm[3][2] = particle->position.z;
 
-		glm::mat4 trans = transglm * scale *cameraRotation;
+		glm::mat4 trans = transglm * scale * rotateBack *cameraRotation;
 
 		glUniformMatrix4fv(uniformLocationsTransformation[i], 1, GL_FALSE, glm::value_ptr(trans)); // &trans[0]);
 		glUniform4f(uniformLocationsColor[i], particle->color.x, particle->color.y, particle->color.z, particle->color.w);
@@ -456,10 +426,11 @@ void handleKeyChange(bool* currentValue, int action) {
 	}
 }
 
-void interpolateCamera(glm::vec3 &targetPosition, glm::vec3 &cameraPosition) {
-	float dt = 0.01f;
+void interpolateCamera(glm::vec3 &targetPosition, glm::vec3 &cameraPosition, float dt) {
 	glm::vec3 direction = glm::normalize(targetPosition - cameraPosition);
-	cameraPosition = cameraPosition + direction * dt * glm::length(targetPosition - cameraPosition) / 1.0f * 18.0f;
+	if (glm::length(direction) > 0.5f) {
+		cameraPosition = cameraPosition + direction * dt * glm::length(targetPosition - cameraPosition) / 1.0f * 16.0f;
+	}
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -627,6 +598,21 @@ int main() {
 	return program();
 }
 
+glm::mat4 getEntityTransformation(Entity &entity, bool useRotation) {
+	glm::mat4 toPivot = glm::translate(glm::mat4(), -entity.getRotationPivot());
+	glm::mat4 translation = glm::translate(glm::mat4(), entity.position);
+	glm::mat4 scale = glm::scale(glm::mat4(), entity.scale);
+	glm::quat quaternion = directionToQuaternion(entity.forward, entity.up, DEFAULT_FORWARD, DEFAULT_UP);
+	glm::mat4 rotation = glm::toMat4(quaternion);
+	glm::mat4 transformation = translation * glm::inverse(toPivot) * rotation * toPivot * scale;
+	if (entity.getParentEntity()) {
+		return getEntityTransformation(*entity.getParentEntity()) * transformation;
+	}
+	else {
+		return transformation;
+	}
+}
+
 int program() {
 	const int windowHeight = 900;
 	const int windowWidth = 1700;
@@ -762,18 +748,19 @@ int program() {
 	Model particleModel = getVAOQuad();
 	ParticleSystem smoke = ParticleSystem(40000);
 	smoke.model = particleModel;
-	smoke.position = glm::vec3(17, 78, 43);
-	smoke.particlesPerSecond = 60;
+	smoke.position = glm::vec3(10, 10, 10);
+	smoke.particlesPerSecond = 100;
 	smoke.timeSinceLastSpawn = 0;
 	smoke.direction = glm::normalize(glm::vec3(1, 0, 0));
-	smoke.spreadAngle = 0.65f;
-	smoke.minLifetime = 1.0f;
-	smoke.maxLifetime = 6.2f;
-	smoke.textureId = loadPNGTexture("Resources/particle-atlas.png");
-	smoke.atlasSize = 9;
+	smoke.spreadAngle = M_PI / 4;
+	smoke.minLifetime = 0.5f;
+	smoke.maxLifetime = 1.7f;
+	smoke.textureId = loadPNGTexture("Resources/particle-atlas2.png");
+	smoke.atlasSize = 8;
 	smoke.startColor = glm::vec4(1, 0, 0, 1);
 	smoke.endColor = glm::vec4(1, 1, 0, 0);
-	smoke.velocity = 0.55f;
+	smoke.velocity = 10.25f;
+	smoke.setDirection(-0.05f, 0.05f, -0.8, -1, -0.05f, 0.05f);
 
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -866,7 +853,9 @@ int program() {
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 14.0f, cameraUp);
 		if (entityToFollow) {
 			glm::vec3 targetPosition = entityToFollow->position + -entityToFollow->forward * 2.5f * (boom ? 2.0f : 1.0f) + entityToFollow->up * 1.0f  * (boom ? 2.0f : 1.0f);
-			interpolateCamera(targetPosition, cameraPosition);
+			//cameraPosition = targetPosition;
+
+			interpolateCamera(targetPosition, cameraPosition, dt);
 			float terrainHeightAtCamera = getHeightAt(heightmapData, size, tileSizeXZ, cameraPosition.x, cameraPosition.z);
 			if (cameraPosition.y <= terrainHeightAtCamera + 0.05f) {
 				cameraPosition.y = terrainHeightAtCamera + 0.05f;
@@ -917,15 +906,16 @@ int program() {
 		renderEntity(cube, modelShader, cam, perspective, true);
 
 		// Particles
-		//glm::vec3 right = glm::normalize(glm::cross(airplane[0]->up, airplane[0]->forward));
-		//smoke.position = airplane[0]->position - airplane[0]->forward * 1.0f;// +right * 0.8f;
-		//smoke.position = glm::vec3(0, 0.15f, -6.5f);
-		//smoke.direction = glm::vec3(0, 0, -1);
-		//glm::mat4 parentTransformation = getEntityTransformation(*airplane[0]); 
-		glm::mat4 parentTransformation = glm::translate(glm::mat4(), glm::vec3(0, 0, 0));
-		updateParticleSystem(smoke, dt, cameraPosition, cameraForward);
+		glm::vec3 right = glm::normalize(glm::cross(airplane[0]->up, airplane[0]->forward));
+		//smoke.position = airplane[0]->position - airplane[0]->forward * 0.5f;// +right * 0.8f;
+		smoke.position = glm::vec3(0, 0.25f, -5.5f);
+		smoke.direction = glm::vec3(0, 0, -1);
+		//glm::mat4 parentTransformation = getEntityTransformation(*airplane[0], false); 
+		//glm::mat4 parentTransformation = glm::translate(glm::mat4(), glm::vec3(0, 0, 0));
+		Entity parentEntity = *airplane[0];
+		updateParticleSystem(smoke, dt, cameraPosition, cameraForward, parentEntity);
 		if (smoke.numParticles > 0) {
-			renderParticles(smoke.particles, smoke.numParticles, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderColor, parentTransformation, cam, perspective);
+			renderParticles(smoke.particles, smoke.numParticles, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderColor, parentEntity, cam, perspective);
 		}
 
 		// Draw lights

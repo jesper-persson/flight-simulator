@@ -1,7 +1,9 @@
 #include <string>
 #include <glad\glad.h>
+
 #include <glm\vec3.hpp>
 #include <glm\vec4.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <iostream>
 #include <vector>
 
@@ -86,6 +88,9 @@ private:
 	glm::vec3 rotationPivot;
 };
 
+glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp);
+glm::mat4 getEntityTransformation(Entity &entity);
+
 class Terrain : public Entity {
 public:
 	GLuint getTextureId2() {
@@ -126,7 +131,7 @@ public:
 	float attenuationC2;
 };
 
-class Particle {
+class Particle : public Entity {
 public:
 	Particle(glm::vec3 position, glm::vec3 velocity, glm::vec3 scale, float lifetime) {
 		this->position = position;
@@ -139,7 +144,6 @@ public:
 	Particle() {
 
 	}
-	glm::vec3 position;
 	glm::vec3 velocity;
 	int textureId;
 	glm::vec4 color;
@@ -162,6 +166,14 @@ public:
 	~ParticleSystem() {
 		delete particles;
 	}
+	void setDirection(float minX, float maxX, float minZ, float maxZ, float minY, float maxY) {
+		this->minX = minX;
+		this->maxX = maxX;
+		this->minZ = minZ;
+		this->maxZ = maxZ;
+		this->minY = minY;
+		this->maxY = maxY;
+	}
 	glm::vec3 direction;
 	glm::vec3 position;
 	float velocity;
@@ -179,11 +191,11 @@ public:
 	float minLifetime;
 	float maxLifetime;
 	Particle *particles;
+	float minX, maxX, minZ, maxZ, minY, maxY;
 };
 
-void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection);
+void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection, Entity &parentEntity);
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt);
-
 std::string readFile(std::string path);
 
 Model heightmapToModel(float *heightmap, int width, int height, float scaleX, float scaleY, float scaleZ, float textureScale);

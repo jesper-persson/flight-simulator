@@ -10,7 +10,8 @@
 #include <string>
 
 #include <glm/gtx/transform.hpp> 
-#include <glm/gtx/rotate_vector.hpp> 
+#include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include <lodepng.h>
 
@@ -21,6 +22,30 @@
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+
+glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp) {
+	assert(std::abs(glm::dot(forward, up)) <= 0.00001f, "Forward and up must be perpendicular");
+
+	glm::vec3 rotationAxis = glm::normalize(glm::cross(defaultForward, forward));
+	if (glm::dot(defaultForward, forward) > 0.99999f) {
+		rotationAxis = forward;
+	}
+	else if (glm::dot(defaultForward, forward) < -0.99999f) {
+		rotationAxis = up;
+	}
+	float angle = acos(glm::dot(defaultForward, forward));
+	glm::highp_quat quatForward = glm::rotate(glm::quat(), angle, rotationAxis);
+
+	// Account for roll using up vector
+	glm::vec3 newUp = glm::normalize(quatForward * defaultUp);
+	float upAngle = acos(glm::dot(up, newUp));
+	if (glm::dot(newUp, up) > 0.99999f) {
+		return quatForward;
+	}
+	glm::highp_quat quatUp = glm::rotate(glm::quat(), upAngle, glm::normalize(glm::cross(newUp, up)));
+
+	return  quatUp * quatForward;
+}
 
 Entity::Entity() {
 	position = glm::vec3(0, 0, 0);
@@ -34,6 +59,21 @@ Entity::Entity() {
 	parentEntity = nullptr;
 	name = "";
 };
+
+glm::mat4 getEntityTransformation(Entity &entity) {
+	glm::mat4 toPivot = glm::translate(glm::mat4(), -entity.getRotationPivot());
+	glm::mat4 translation = glm::translate(glm::mat4(), entity.position);
+	glm::mat4 scale = glm::scale(glm::mat4(), entity.scale);
+	glm::quat quaternion = directionToQuaternion(entity.forward, entity.up, DEFAULT_FORWARD, DEFAULT_UP);
+	glm::mat4 rotation = glm::toMat4(quaternion);
+	glm::mat4 transformation = translation * glm::inverse(toPivot) * rotation * toPivot * scale;
+	if (entity.getParentEntity()) {
+		return getEntityTransformation(*entity.getParentEntity()) * transformation;
+	}
+	else {
+		return transformation;
+	}
+}
 
 std::string readFile(std::string path) {
 	std::ifstream t(path);
@@ -599,25 +639,32 @@ GLuint loadPNGTexture(std::string filename) {
 // Theta should be [0, 2*pi)
 // Phi should be [-pi/2, pi/2]
 // angleInterval is the total interval for points to be generated around phi and theta.
-glm::vec3 generateParticleDirection(float theta, float phi, float angleInterval) {
-	float accuracyFactor = 100;
+glm::vec3 generateParticleDirection(ParticleSystem &particleSystem) {
+	float xMin = particleSystem.minX;
+	float xMax = particleSystem.maxX;
+	float zMin = particleSystem.minZ;
+	float zMax = particleSystem.maxZ;
+	float yMin = particleSystem.minY;
+	float yMax = particleSystem.maxY;
 
-	float thetaUpperBound = theta + angleInterval / 2;
-	float thetaLowerBound = theta - angleInterval / 2;
-	float phiUpperBound = phi + angleInterval / 2;
-	float phiLowerBound = phi - angleInterval / 2;
-
-	float genTheta = (random(0, (thetaUpperBound - thetaLowerBound) * accuracyFactor) + thetaLowerBound * accuracyFactor) / accuracyFactor;
-	float genPhi = (random(0, (phiUpperBound - phiLowerBound) * accuracyFactor) + phiLowerBound * accuracyFactor) / accuracyFactor; // -(phiUpperBound - phiLowerBound) * accuracyFactor) / accuracyFactor;
-
-	glm::vec3 direction = glm::vec3(0, 0, 0);
-	direction.x = cos(genTheta) * cos(genPhi);
-	direction.z = sin(genTheta) * cos(genPhi);
-	direction.y = sin(genPhi);
+	float scale = 100;
+	float x = (random(0, abs(xMax - xMin) * scale) + xMin * scale) / scale;
+	float y = (random(0, abs(yMax - yMin) * scale) + yMin * scale) / scale;
+	float z = (random(0, abs(zMax - zMin) * scale) + zMin * scale) / scale;
+	glm::vec3 direction = glm::normalize(glm::vec3(x, y, z));
 	return direction;
 }
 
-void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPosition, glm::vec3 cameraForward) {
+glm::vec3 generateParticlePosition(ParticleSystem &particleSystem) {
+	float spawnSphereRadius = 1;
+	float x = (random(0, 1000) - 500) / 500.0f;
+	float y = (random(0, 1000) - 500) / 500.0f;
+	float z = (random(0, 1000) - 500) / 500.0f;
+	glm::vec3 position = glm::normalize(glm::vec3(x, y, z));
+	return position;
+}
+
+void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPosition, glm::vec3 cameraForward, Entity &parentEntity) {
 	if (numParticles == 0) {
 		return;
 	}
@@ -625,7 +672,11 @@ void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPositio
 
 	Particle *particleIterator = particle;
 	for (int i = 0; i < numParticles; i++) {
-		float distance = glm::length(glm::dot(particleIterator->position - cameraPosition, cameraForward));
+		particle->setParentEntity(&parentEntity);
+		glm::mat4 trans = getEntityTransformation(*particleIterator);
+		glm::vec3 position = trans[3];
+
+		float distance = glm::length(glm::dot(position - cameraPosition, cameraForward));
 		z[i].first = *particleIterator;
 		z[i].second = distance;
 		particleIterator++;
@@ -641,10 +692,10 @@ void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPositio
 		particle[i] = z[i].first;
 	}
 
-	delete z;
+	delete[] z;
 }
 
-void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection) {
+void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection, Entity &parentEntity) {
 	for (int i = 0; i < particleSystem.numParticles; i++) {
 		updateParticle(particleSystem, particleSystem.particles[i], dt);
 		if (particleSystem.particles[i].timeAlive >= particleSystem.particles[i].lifetime) {
@@ -658,22 +709,26 @@ void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 ca
 
 	particleSystem.timeSinceLastSpawn += dt;
 	int numParticlesToSpawn = (int)particleSystem.particlesPerSecond * particleSystem.timeSinceLastSpawn;
+
 	for (int i = 0; i < numParticlesToSpawn && particleSystem.numParticles < particleSystem.maxNumParticles; i++) {
 		Particle p = Particle(particleSystem.position, glm::vec3(0, 0, 0), glm::vec3(0.02f, 0.02f, 0.02f), 1.0f);
 		p.model = particleSystem.model;
 		p.lifetime = random(particleSystem.minLifetime * 100, particleSystem.maxLifetime * 100) / 100.0f;
 		p.color = particleSystem.startColor;
 		p.textureId = particleSystem.textureId;
+		
 		float theta = atan2(particleSystem.direction.z, particleSystem.direction.x);
 		float phi = asin(particleSystem.direction.y);
-		
-		p.velocity = generateParticleDirection(theta, phi, particleSystem.spreadAngle) * particleSystem.velocity;
+		p.velocity = generateParticleDirection(particleSystem) * 0.2f * particleSystem.velocity;
+		p.position = glm::normalize(p.velocity) + particleSystem.position;
+		p.setParentEntity(&parentEntity);
+
 		particleSystem.particles[particleSystem.numParticles] = p;
 		particleSystem.numParticles += 1;
 		particleSystem.timeSinceLastSpawn = 0;
 	}
 
-	sortParticles(particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection);
+	sortParticles(particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection, parentEntity);
 }
 
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt) {
