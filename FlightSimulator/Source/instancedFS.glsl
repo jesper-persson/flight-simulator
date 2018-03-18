@@ -1,6 +1,5 @@
 out vec4 gl_Color;
 
-in vec4 colorVS;
 in vec2 textureVS;
 in float progressVS;
 
@@ -14,8 +13,6 @@ vec4 getSprite(int index) {
 }
 
 void main() {
-	//gl_Color = vec4(colorVS);
-
 	float progressPerImage = 1.0f / (atlasSize * atlasSize);
 
 	int i = int(progressVS * atlasSize * atlasSize);

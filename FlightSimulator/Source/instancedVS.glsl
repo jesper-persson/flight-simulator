@@ -6,7 +6,6 @@ uniform mat4 parentTransformation;
 uniform mat4 projectionMatrix;
 uniform mat4 worldToView;
 uniform float progress[100];
-uniform vec4 color[100];
 
 out vec4 colorVS;
 out vec2 textureVS;
@@ -15,7 +14,6 @@ out float progressVS;
 void main() {
 	progressVS = progress[gl_InstanceID];
 	textureVS = textureTangentSpace;
-	colorVS = color[gl_InstanceID];
 
 	mat4 viewcp = worldToView;
 	gl_Position = projectionMatrix * viewcp * parentTransformation * modelToWorld[gl_InstanceID] * vec4(positionModelSpace, 1);

@@ -85,6 +85,8 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Libraries\tinyobjloader;$(ProjectDir)Libraries\lodepng;$(ProjectDir)Libraries\glm-0.9.8.5\glm;$(ProjectDir)Libraries\glfw-3.2.1.bin.WIN64\include;$(ProjectDir)Libraries\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_SECURE_SCL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Users\piers\Projekt\c++\flight-simulator\FlightSimulator\Libraries\glfw-3.2.1.bin.WIN64\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

@@ -106,11 +106,14 @@ void renderSkybox(Entity &skybox, GLuint secondSkyboxTexture, float interpolatio
 	glEnable(GL_DEPTH_TEST);
 }
 
-void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram, int uniformLocationsTransformation[], int uniformLocationsColor[], Entity &parentEntity, glm::mat4 &worldToView, glm::mat4 &perspective) {
+void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, int uniformLocationsTransformation[], int uniformLocationsProgress[], glm::mat4 &worldToView, glm::mat4 &perspective) {
+	Particle *particle = particleSystem.particles;
+
 	glUseProgram(shaderProgram);
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 
+	Entity parentEntity = *particle->getParentEntity();
 	glm::mat4 parentTransformation = getEntityTransformation(parentEntity);
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parentTransformation));
 
@@ -125,13 +128,10 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 	cameraRotation[3][2] = 0;
 	cameraRotation[3][3] = 1;
 	
-	int numIndices = particle->model.numIndices;
+	int numIndices = particleSystem.model.numIndices;
 	int i = 0;
 
-	LARGE_INTEGER startingTime, endingTime, elapsedMicroseconds;
-	LARGE_INTEGER frequency;
-
-	float size = 0.55f;
+	float size = 0.4f;// particle->scale.x;
 	float trans[] = {
 		size, 0, 0, 0,
 		0, size, 0, 0,
@@ -144,11 +144,11 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 	glm::quat quaternion = directionToQuaternion(glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), DEFAULT_FORWARD, DEFAULT_UP);
 	glm::mat4 rotation = glm::toMat4(quaternion);
 
-	QueryPerformanceFrequency(&frequency);
-	QueryPerformanceCounter(&startingTime);
+	glm::mat4 totalRotationGLM = rotateBack * cameraRotation;
+	float *totalRotation = glm::value_ptr(totalRotationGLM);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, particle->textureId);
+	glBindTexture(GL_TEXTURE_2D, particleSystem.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -156,18 +156,40 @@ void renderParticles(Particle *particle, int numParticles, GLuint shaderProgram,
 
 	std::string uniformNameProgress = std::string("atlasSize");
 	glUniform1i(glGetUniformLocation(shaderProgram, uniformNameProgress.c_str()), 8);
-	for (int j = 0; j < numParticles; i++, j++) {
-		transglm[3][0] = particle->position.x;
-		transglm[3][1] = particle->position.y;
-		transglm[3][2] = particle->position.z;
 
-		glm::mat4 trans = transglm * scale * rotateBack *cameraRotation;
+	LARGE_INTEGER startingTime, endingTime, elapsedMicroseconds;
+	LARGE_INTEGER frequency;
+	QueryPerformanceFrequency(&frequency);
+	QueryPerformanceCounter(&startingTime);
 
-		glUniformMatrix4fv(uniformLocationsTransformation[i], 1, GL_FALSE, glm::value_ptr(trans)); // &trans[0]);
-		glUniform4f(uniformLocationsColor[i], particle->color.x, particle->color.y, particle->color.z, particle->color.w);
+	float transformation[] = {
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 1,
+	};
 
-		std::string uniformNameProgress = std::string("progress[") + std::to_string(i) + std::string("]");
-		glUniform1f(glGetUniformLocation(shaderProgram, uniformNameProgress.c_str()), particle->timeAlive / particle->lifetime);
+	for (int j = 0; j < particleSystem.numParticles; i++, j++) {
+		// Rotation
+		transformation[1] = totalRotation[4];
+		transformation[2] = totalRotation[8];
+		transformation[4] = totalRotation[1];
+		transformation[6] = totalRotation[9];
+		transformation[8] = totalRotation[2];
+		transformation[9] = totalRotation[6];
+
+		// Scale (and some rotation)
+		transformation[0] = particle->scale.x * totalRotation[0];
+		transformation[5] = particle->scale.y * totalRotation[5];
+		transformation[10] = particle->scale.z * totalRotation[10];
+
+		// Transform
+		transformation[3] = particle->position.x;
+		transformation[7] = particle->position.y;
+		transformation[11] = particle->position.z;
+
+		glUniformMatrix4fv(uniformLocationsTransformation[i], 1, GL_TRUE, &transformation[0]);
+		glUniform1f(uniformLocationsProgress[i], particle->timeAlive / particle->lifetime);
 		particle++;
 
 		if (i >= NUM_PARTICLES_PER_DRAW_CALL - 1) {
@@ -648,12 +670,12 @@ int program() {
 	GLuint terrainShader = getShader("Source/terrainVS.glsl", "Source/terrainFS.glsl");
 	GLuint instancedShader = getShader("Source/instancedVS.glsl", "Source/instancedFS.glsl");
 	int uniformLocationInstanceShaderTransformation[NUM_PARTICLES_PER_DRAW_CALL];
-	int uniformLocationInstanceShaderColor[NUM_PARTICLES_PER_DRAW_CALL];
+	int uniformLocationInstanceShaderProgress[NUM_PARTICLES_PER_DRAW_CALL];
 	for (int i = 0; i < NUM_PARTICLES_PER_DRAW_CALL; i++) {
 		std::string uniformName = std::string("modelToWorld[") + std::to_string(i) + std::string("]");
-		std::string uniformNameColor = std::string("color[") + std::to_string(i) + std::string("]");
+		std::string uniformNameColor = std::string("progress[") + std::to_string(i) + std::string("]");
 		uniformLocationInstanceShaderTransformation[i] = glGetUniformLocation(instancedShader, uniformName.c_str());
-		uniformLocationInstanceShaderColor[i] = glGetUniformLocation(instancedShader, uniformNameColor.c_str());
+		uniformLocationInstanceShaderProgress[i] = glGetUniformLocation(instancedShader, uniformNameColor.c_str());
 	}
 
 	int size = 2049;
@@ -749,18 +771,19 @@ int program() {
 	ParticleSystem smoke = ParticleSystem(40000);
 	smoke.model = particleModel;
 	smoke.position = glm::vec3(10, 10, 10);
-	smoke.particlesPerSecond = 100;
+	smoke.particlesPerSecond = 25000;
 	smoke.timeSinceLastSpawn = 0;
-	smoke.direction = glm::normalize(glm::vec3(1, 0, 0));
-	smoke.spreadAngle = M_PI / 4;
-	smoke.minLifetime = 0.5f;
-	smoke.maxLifetime = 1.7f;
+	smoke.minLifetime = 0.9f;
+	smoke.maxLifetime = 1.0f;
+	smoke.minSize = 0.4f;
+	smoke.maxSize = 0.6f;
+	smoke.sphereRadiusSpawn = 0.2f;
 	smoke.textureId = loadPNGTexture("Resources/particle-atlas2.png");
 	smoke.atlasSize = 8;
-	smoke.startColor = glm::vec4(1, 0, 0, 1);
-	smoke.endColor = glm::vec4(1, 1, 0, 0);
-	smoke.velocity = 10.25f;
-	smoke.setDirection(-0.05f, 0.05f, -0.8, -1, -0.05f, 0.05f);
+	smoke.velocity = 2.25f;
+	smoke.position = glm::vec3(0, 0.25f, -5.9f);
+	smoke.setDirection(-0.08f, 0.08f, -0.8, -1, -0.05f, 0.05f);
+	smoke.parentEntity = airplane[0];
 
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -906,16 +929,10 @@ int program() {
 		renderEntity(cube, modelShader, cam, perspective, true);
 
 		// Particles
-		glm::vec3 right = glm::normalize(glm::cross(airplane[0]->up, airplane[0]->forward));
-		//smoke.position = airplane[0]->position - airplane[0]->forward * 0.5f;// +right * 0.8f;
-		smoke.position = glm::vec3(0, 0.25f, -5.5f);
-		smoke.direction = glm::vec3(0, 0, -1);
-		//glm::mat4 parentTransformation = getEntityTransformation(*airplane[0], false); 
-		//glm::mat4 parentTransformation = glm::translate(glm::mat4(), glm::vec3(0, 0, 0));
 		Entity parentEntity = *airplane[0];
-		updateParticleSystem(smoke, dt, cameraPosition, cameraForward, parentEntity);
+		updateParticleSystem(smoke, cameraPosition, cameraForward, dt);
 		if (smoke.numParticles > 0) {
-			renderParticles(smoke.particles, smoke.numParticles, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderColor, parentEntity, cam, perspective);
+			renderParticleSystem(smoke, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderProgress, cam, perspective);
 		}
 
 		// Draw lights

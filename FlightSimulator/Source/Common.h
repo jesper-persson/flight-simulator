@@ -63,13 +63,13 @@ public:
 	void setModel(Model model) {
 		this->model = model;
 	}
-	Entity *getParentEntity() {
+	Entity *getParentEntity() const {
 		return parentEntity;
 	}
 	void setParentEntity(Entity *parentEntity) {
 		this->parentEntity = parentEntity;
 	}
-	glm::vec3 getRotationPivot() {
+	glm::vec3 getRotationPivot() const {
 		return rotationPivot;
 	}
 	void setRotationPivot(glm::vec3 rotationPivot) {
@@ -89,7 +89,7 @@ private:
 };
 
 glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp);
-glm::mat4 getEntityTransformation(Entity &entity);
+glm::mat4 getEntityTransformation(Entity const &entity);
 
 class Terrain : public Entity {
 public:
@@ -131,26 +131,30 @@ public:
 	float attenuationC2;
 };
 
-class Particle : public Entity {
+// Avoid extending Entity to make memcpy usable
+class Particle {
 public:
-	Particle(glm::vec3 position, glm::vec3 velocity, glm::vec3 scale, float lifetime) {
+	Particle(glm::vec3 position, glm::vec3 scale, glm::vec3 velocity, float lifetime) {
 		this->position = position;
 		this->velocity = velocity;
 		this->scale = scale;
-		color = glm::vec4(1, 1, 1, 1);
-		timeAlive = 0;
 		this->lifetime = lifetime;
 	}
 	Particle() {
 
 	}
-	glm::vec3 velocity;
-	int textureId;
-	glm::vec4 color;
+	void setParentEntity(Entity *parentEntity) {
+		this->parentEntity = parentEntity;
+	}
+	Entity *getParentEntity() {
+		return this->parentEntity;
+	}
+	Entity *parentEntity;
 	glm::vec3 scale;
-	Model model;
+	glm::vec3 position;
+	glm::vec3 velocity;
 	// Denotes the duration in seconds this particle has lived
-	float timeAlive;
+	float timeAlive = 0;
 	// Denotes the duration in seconds this particle should live
 	float lifetime;
 };
@@ -160,8 +164,6 @@ public:
 	ParticleSystem(int maxNumParticles) {
 		this->maxNumParticles = maxNumParticles;
 		particles = new Particle[maxNumParticles];
-		velocity = 0;
-		timeSinceLastSpawn = 0;
 	}
 	~ParticleSystem() {
 		delete particles;
@@ -174,13 +176,8 @@ public:
 		this->minY = minY;
 		this->maxY = maxY;
 	}
-	glm::vec3 direction;
 	glm::vec3 position;
-	float velocity;
-	glm::vec4 startColor;
-	glm::vec4 endColor;
-	// Angle from center
-	float spreadAngle;
+	float velocity = 0;
 	Model model;
 	int textureId;
 	int atlasSize;
@@ -190,11 +187,17 @@ public:
 	float timeSinceLastSpawn;
 	float minLifetime;
 	float maxLifetime;
+	float minSize = 1;
+	float maxSize = 1;
+	float sphereRadiusSpawn = 1;
 	Particle *particles;
 	float minX, maxX, minZ, maxZ, minY, maxY;
+	Entity *parentEntity;
 };
 
-void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection, Entity &parentEntity);
+// cameraPosition and cameraDirection is needed for depth sorting
+void updateParticleSystem(ParticleSystem &particleSystem, glm::vec3 cameraPosition, glm::vec3 cameraDirection, float dt);
+
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt);
 std::string readFile(std::string path);
 

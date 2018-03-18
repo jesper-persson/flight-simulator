@@ -9,6 +9,10 @@
 #include <vector>
 #include <string>
 
+#include <glm/mat4x4.hpp>
+#include <glm/matrix.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp> 
 #include <glm/gtx/transform.hpp> 
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -60,7 +64,7 @@ Entity::Entity() {
 	name = "";
 };
 
-glm::mat4 getEntityTransformation(Entity &entity) {
+glm::mat4 getEntityTransformation(Entity const &entity) {
 	glm::mat4 toPivot = glm::translate(glm::mat4(), -entity.getRotationPivot());
 	glm::mat4 translation = glm::translate(glm::mat4(), entity.position);
 	glm::mat4 scale = glm::scale(glm::mat4(), entity.scale);
@@ -635,10 +639,6 @@ GLuint loadPNGTexture(std::string filename) {
 	return texId;
 }
 
-// Paramater theta and phi denote a point on the unit sphere where theta = 0 and phi = 0 denote the point (1, 0, 0).
-// Theta should be [0, 2*pi)
-// Phi should be [-pi/2, pi/2]
-// angleInterval is the total interval for points to be generated around phi and theta.
 glm::vec3 generateParticleDirection(ParticleSystem &particleSystem) {
 	float xMin = particleSystem.minX;
 	float xMax = particleSystem.maxX;
@@ -655,47 +655,61 @@ glm::vec3 generateParticleDirection(ParticleSystem &particleSystem) {
 	return direction;
 }
 
-glm::vec3 generateParticlePosition(ParticleSystem &particleSystem) {
-	float spawnSphereRadius = 1;
-	float x = (random(0, 1000) - 500) / 500.0f;
-	float y = (random(0, 1000) - 500) / 500.0f;
-	float z = (random(0, 1000) - 500) / 500.0f;
-	glm::vec3 position = glm::normalize(glm::vec3(x, y, z));
-	return position;
-}
-
-void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPosition, glm::vec3 cameraForward, Entity &parentEntity) {
+void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPosition, glm::vec3 cameraForward) {
 	if (numParticles == 0) {
 		return;
 	}
-	std::pair<Particle, float> *z = new std::pair<Particle, float>[numParticles];
 
+	LARGE_INTEGER startingTime, endingTime, elapsedMicroseconds;
+	LARGE_INTEGER frequency;
+	QueryPerformanceFrequency(&frequency);
+	QueryPerformanceCounter(&startingTime);
+
+	// Rembember that parentTransformation will be column major
+	const float *parentTransformation = glm::value_ptr(getEntityTransformation(*particle->getParentEntity()));
+
+	std::pair<float, int> *sortArray = new std::pair<float, int>[numParticles];
 	Particle *particleIterator = particle;
+	glm::vec3 position;
+	glm::vec3 distance;
 	for (int i = 0; i < numParticles; i++) {
-		particle->setParentEntity(&parentEntity);
-		glm::mat4 trans = getEntityTransformation(*particleIterator);
-		glm::vec3 position = trans[3];
+		position.x = parentTransformation[0] * particleIterator->position.x + parentTransformation[4] * particleIterator->position.y + parentTransformation[8] * particleIterator->position.z + parentTransformation[12];
+		position.y = parentTransformation[1] * particleIterator->position.x + parentTransformation[5] * particleIterator->position.y + parentTransformation[9] * particleIterator->position.z + parentTransformation[13];
+		position.z = parentTransformation[2] * particleIterator->position.x + parentTransformation[6] * particleIterator->position.y + parentTransformation[10] * particleIterator->position.z + parentTransformation[14];
 
-		float distance = glm::length(glm::dot(position - cameraPosition, cameraForward));
-		z[i].first = *particleIterator;
-		z[i].second = distance;
+		distance = position - cameraPosition;
+		sortArray[i].first = distance.x * cameraForward.x + distance.y * cameraForward.y + distance.z * cameraForward.z;
+		sortArray[i].second = i;
+
 		particleIterator++;
 	}
-	
-	std::pair<Particle, float> *last = &z[numParticles - 1];
-	std::sort(z, last, [](std::pair<Particle, float> const &a, std::pair<Particle, float> const  &b) -> bool {
-		return a.second > b.second;
-	});
 
-	particleIterator = particle;
+	Particle *particleCopy = new Particle[numParticles];
 	for (int i = 0; i < numParticles; i++) {
-		particle[i] = z[i].first;
+		particleCopy[i] = particle[i];
 	}
 
-	delete[] z;
+	std::pair<float, int> *last = &sortArray[numParticles - 1];
+	std::sort(sortArray, last, [](std::pair<float, int> const &a, std::pair<float, int> const  &b) -> bool {
+		return a.first > b.first;
+	});
+	
+	for (int i = 0; i < numParticles; i++) {
+		particle[i] = particleCopy[sortArray[i].second];
+	}
+
+	delete[] particleCopy;
+	delete[] sortArray;
+
+	QueryPerformanceCounter(&endingTime);
+	elapsedMicroseconds.QuadPart = endingTime.QuadPart - startingTime.QuadPart;
+	elapsedMicroseconds.QuadPart *= 1000000;
+	elapsedMicroseconds.QuadPart /= frequency.QuadPart;
+	//std::cout << elapsedMicroseconds.QuadPart << std::endl;
 }
 
-void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 cameraPosition, glm::vec3 cameraDirection, Entity &parentEntity) {
+void updateParticleSystem(ParticleSystem &particleSystem, glm::vec3 cameraPosition, glm::vec3 cameraDirection, float dt) {
+	// Update particles
 	for (int i = 0; i < particleSystem.numParticles; i++) {
 		updateParticle(particleSystem, particleSystem.particles[i], dt);
 		if (particleSystem.particles[i].timeAlive >= particleSystem.particles[i].lifetime) {
@@ -707,36 +721,30 @@ void updateParticleSystem(ParticleSystem &particleSystem, float dt, glm::vec3 ca
 		}
 	}
 
+	// Spawn new particles
 	particleSystem.timeSinceLastSpawn += dt;
 	int numParticlesToSpawn = (int)particleSystem.particlesPerSecond * particleSystem.timeSinceLastSpawn;
-
 	for (int i = 0; i < numParticlesToSpawn && particleSystem.numParticles < particleSystem.maxNumParticles; i++) {
-		Particle p = Particle(particleSystem.position, glm::vec3(0, 0, 0), glm::vec3(0.02f, 0.02f, 0.02f), 1.0f);
-		p.model = particleSystem.model;
+		Particle p = Particle();
+		float scale = random(particleSystem.minSize * 100, particleSystem.maxSize * 100) / 100.0f;
+		p.scale = glm::vec3(scale, scale, 1.0f);
 		p.lifetime = random(particleSystem.minLifetime * 100, particleSystem.maxLifetime * 100) / 100.0f;
-		p.color = particleSystem.startColor;
-		p.textureId = particleSystem.textureId;
-		
-		float theta = atan2(particleSystem.direction.z, particleSystem.direction.x);
-		float phi = asin(particleSystem.direction.y);
-		p.velocity = generateParticleDirection(particleSystem) * 0.2f * particleSystem.velocity;
-		p.position = glm::normalize(p.velocity) + particleSystem.position;
-		p.setParentEntity(&parentEntity);
+		p.velocity = generateParticleDirection(particleSystem) * particleSystem.velocity;
+		p.position = glm::normalize(p.velocity) * particleSystem.sphereRadiusSpawn + particleSystem.position;
+		p.setParentEntity(particleSystem.parentEntity);
 
 		particleSystem.particles[particleSystem.numParticles] = p;
 		particleSystem.numParticles += 1;
 		particleSystem.timeSinceLastSpawn = 0;
 	}
 
-	sortParticles(particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection, parentEntity);
+	// Sort particles
+	sortParticles(particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection);
 }
 
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt) {
 	particle.position = particle.position + particle.velocity * dt;
 	particle.timeAlive += dt;
-
-	float t = particle.timeAlive / particle.lifetime;
-	particle.color = particleSystem.endColor * t + (1 - t) * particleSystem.startColor;
 }
 
 int random(int min, int max) {
