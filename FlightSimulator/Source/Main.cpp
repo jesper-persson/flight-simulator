@@ -113,13 +113,19 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "worldToView"), 1, GL_FALSE, glm::value_ptr(worldToView));
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 
-	Entity parentEntity = *particle->getParentEntity();
-	glm::mat4 parentTransformation = getEntityTransformation(parentEntity);
-	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parentTransformation));
-
-	// Get rotation matrix for rotating back, from the rotation crated from parent transformation
-	glm::quat quaternion2 = directionToQuaternion(parentEntity.forward, parentEntity.up, DEFAULT_FORWARD, DEFAULT_UP);
-	glm::mat4 rotateBack = glm::inverse(glm::toMat4(quaternion2));
+	glm::mat4 rotateBack;
+	if (particle->getParentEntity()) {
+		Entity parentEntity = *particle->getParentEntity();
+		glm::mat4 parentTransformation = getEntityTransformation(parentEntity);
+		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parentTransformation));
+		// Get rotation matrix for rotating back, from the rotation crated from parent transformation
+		glm::quat quaternion2 = directionToQuaternion(parentEntity.forward, parentEntity.up, DEFAULT_FORWARD, DEFAULT_UP);
+		rotateBack = glm::inverse(glm::toMat4(quaternion2));
+	} else {
+		glm::mat4 identity = glm::mat4();
+		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(identity));
+		rotateBack = identity;
+	}
 
 	// Extract camera rotation from worldToView
 	glm::mat4 cameraRotation = glm::inverse(worldToView);
@@ -128,29 +134,16 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	cameraRotation[3][2] = 0;
 	cameraRotation[3][3] = 1;
 	
-	int numIndices = particleSystem.model.numIndices;
-	int i = 0;
-
-	float size = 0.4f;// particle->scale.x;
-	float trans[] = {
-		size, 0, 0, 0,
-		0, size, 0, 0,
-		0, 0, size, 0,
-		0, 0, 0, 1,
-	};
-
-	glm::mat4 transglm = glm::translate(glm::mat4(), glm::vec3(0, 0, 0));
-	glm::mat4 scale = glm::scale(glm::mat4(), glm::vec3(size, size, size));
-	glm::quat quaternion = directionToQuaternion(glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), DEFAULT_FORWARD, DEFAULT_UP);
-	glm::mat4 rotation = glm::toMat4(quaternion);
-
 	glm::mat4 totalRotationGLM = rotateBack * cameraRotation;
 	float *totalRotation = glm::value_ptr(totalRotationGLM);
+
+	int numIndices = particleSystem.model.numIndices;
+	int i = 0;
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, particleSystem.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//glDisable(GL_DEPTH_TEST);
 
@@ -170,17 +163,15 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	};
 
 	for (int j = 0; j < particleSystem.numParticles; i++, j++) {
-		// Rotation
-		transformation[1] = totalRotation[4];
-		transformation[2] = totalRotation[8];
-		transformation[4] = totalRotation[1];
-		transformation[6] = totalRotation[9];
-		transformation[8] = totalRotation[2];
-		transformation[9] = totalRotation[6];
-
-		// Scale (and some rotation)
+		// Rotation and scale
 		transformation[0] = particle->scale.x * totalRotation[0];
+		transformation[1] = particle->scale.y * totalRotation[4];
+		transformation[2] = particle->scale.z * totalRotation[8];
+		transformation[4] = particle->scale.x * totalRotation[1];
 		transformation[5] = particle->scale.y * totalRotation[5];
+		transformation[6] = particle->scale.z * totalRotation[9];
+		transformation[8] = particle->scale.x * totalRotation[2];
+		transformation[9] = particle->scale.y * totalRotation[6];
 		transformation[10] = particle->scale.z * totalRotation[10];
 
 		// Transform
@@ -771,16 +762,16 @@ int program() {
 	ParticleSystem smoke = ParticleSystem(40000);
 	smoke.model = particleModel;
 	smoke.position = glm::vec3(10, 10, 10);
-	smoke.particlesPerSecond = 25000;
+	smoke.particlesPerSecond = 300;
 	smoke.timeSinceLastSpawn = 0;
 	smoke.minLifetime = 0.9f;
-	smoke.maxLifetime = 1.0f;
-	smoke.minSize = 0.4f;
-	smoke.maxSize = 0.6f;
-	smoke.sphereRadiusSpawn = 0.2f;
+	smoke.maxLifetime = 2.0f;
+	smoke.minSize = 0.2f;
+	smoke.maxSize = 0.4f;
+	smoke.sphereRadiusSpawn = 1.0f;
 	smoke.textureId = loadPNGTexture("Resources/particle-atlas2.png");
 	smoke.atlasSize = 8;
-	smoke.velocity = 2.25f;
+	smoke.velocity = 3.25f;
 	smoke.position = glm::vec3(0, 0.25f, -5.9f);
 	smoke.setDirection(-0.08f, 0.08f, -0.8, -1, -0.05f, 0.05f);
 	smoke.parentEntity = airplane[0];

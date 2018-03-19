@@ -666,16 +666,23 @@ void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPositio
 	QueryPerformanceCounter(&startingTime);
 
 	// Rembember that parentTransformation will be column major
-	const float *parentTransformation = glm::value_ptr(getEntityTransformation(*particle->getParentEntity()));
+	const float *parentTransformation = nullptr;
+	if (particle->getParentEntity()) {
+		parentTransformation = glm::value_ptr(getEntityTransformation(*particle->getParentEntity()));
+	}
 
 	std::pair<float, int> *sortArray = new std::pair<float, int>[numParticles];
 	Particle *particleIterator = particle;
 	glm::vec3 position;
 	glm::vec3 distance;
 	for (int i = 0; i < numParticles; i++) {
-		position.x = parentTransformation[0] * particleIterator->position.x + parentTransformation[4] * particleIterator->position.y + parentTransformation[8] * particleIterator->position.z + parentTransformation[12];
-		position.y = parentTransformation[1] * particleIterator->position.x + parentTransformation[5] * particleIterator->position.y + parentTransformation[9] * particleIterator->position.z + parentTransformation[13];
-		position.z = parentTransformation[2] * particleIterator->position.x + parentTransformation[6] * particleIterator->position.y + parentTransformation[10] * particleIterator->position.z + parentTransformation[14];
+		if (parentTransformation) {
+			position.x = parentTransformation[0] * particleIterator->position.x + parentTransformation[4] * particleIterator->position.y + parentTransformation[8] * particleIterator->position.z + parentTransformation[12];
+			position.y = parentTransformation[1] * particleIterator->position.x + parentTransformation[5] * particleIterator->position.y + parentTransformation[9] * particleIterator->position.z + parentTransformation[13];
+			position.z = parentTransformation[2] * particleIterator->position.x + parentTransformation[6] * particleIterator->position.y + parentTransformation[10] * particleIterator->position.z + parentTransformation[14];
+		} else {
+			position = particleIterator->position;
+		}
 
 		distance = position - cameraPosition;
 		sortArray[i].first = distance.x * cameraForward.x + distance.y * cameraForward.y + distance.z * cameraForward.z;
