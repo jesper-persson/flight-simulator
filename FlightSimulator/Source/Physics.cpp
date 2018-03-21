@@ -36,10 +36,10 @@ void steerAirplane(Entity &main, Entity &aileronLeft, Entity &aileronRight, Enti
 	{
 		float rotAmountPitch = -dt * 1.9f;
 		if (pitch) {
-			rotAmountPitch *= (float)pitch;
+			rotAmountPitch *= -(float)pitch;
 		}
 		else {
-			rotAmountPitch *= glm::dot(leftFlap.forward, DEFAULT_UP) > 0 ? -1 : 1;
+			rotAmountPitch *= glm::dot(rightFlap.forward, DEFAULT_UP) > 0 ? -1 : 1;
 		}
 
 		glm::vec3 rotAxis = glm::normalize(glm::vec3(1, 0, 0));
@@ -53,8 +53,8 @@ void steerAirplane(Entity &main, Entity &aileronLeft, Entity &aileronRight, Enti
 			leftFlap.up = DEFAULT_UP;
 			rightFlap.forward = DEFAULT_FORWARD;
 			rightFlap.up = DEFAULT_UP;
-			rotateEntity(leftFlap, rotAxis, -(float)pitch*maxAnglePitch);
-			rotateEntity(rightFlap, rotAxis, -(float)pitch*maxAnglePitch);
+			rotateEntity(leftFlap, rotAxis, (float)pitch*maxAnglePitch);
+			rotateEntity(rightFlap, rotAxis, (float)pitch*maxAnglePitch);
 		}
 	}
 
@@ -89,7 +89,7 @@ void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, floa
 	}
 
 	// Pitch
-	float attackAnglePitch = acos(glm::dot(leftFlap.forward, DEFAULT_FORWARD));
+	float attackAnglePitch = -acos(glm::dot(leftFlap.forward, DEFAULT_FORWARD));
 	if (glm::dot(leftFlap.forward, DEFAULT_UP) < 0) { // Lift
 		attackAnglePitch = -attackAnglePitch;
 	}
