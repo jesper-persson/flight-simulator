@@ -168,13 +168,13 @@ public:
 	~ParticleSystem() {
 		delete particles;
 	}
-	void setDirection(float minX, float maxX, float minZ, float maxZ, float minY, float maxY) {
+	void setDirection(float minX, float maxX, float minY, float maxY, float minZ, float maxZ) {
 		this->minX = minX;
 		this->maxX = maxX;
-		this->minZ = minZ;
-		this->maxZ = maxZ;
 		this->minY = minY;
 		this->maxY = maxY;
+		this->minZ = minZ;
+		this->maxZ = maxZ;
 	}
 	glm::vec3 position;
 	float velocity = 0;
@@ -193,6 +193,7 @@ public:
 	Particle *particles;
 	float minX, maxX, minZ, maxZ, minY, maxY;
 	Entity *parentEntity;
+	bool followParent = false;
 };
 
 // cameraPosition and cameraDirection is needed for depth sorting
@@ -219,5 +220,7 @@ void calculateTangents(float *vertexData, float *textureData, int numVertices, f
 GLuint loadPNGTexture(std::string filename);
 
 int random(int min, int max);
+
+int sign(float i);
 
 #endif

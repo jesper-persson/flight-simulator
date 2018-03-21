@@ -642,15 +642,16 @@ GLuint loadPNGTexture(std::string filename) {
 glm::vec3 generateParticleDirection(ParticleSystem &particleSystem) {
 	float xMin = particleSystem.minX;
 	float xMax = particleSystem.maxX;
-	float zMin = particleSystem.minZ;
-	float zMax = particleSystem.maxZ;
 	float yMin = particleSystem.minY;
 	float yMax = particleSystem.maxY;
+	float zMin = particleSystem.minZ;
+	float zMax = particleSystem.maxZ;
 
 	float scale = 100;
 	float x = (random(0, abs(xMax - xMin) * scale) + xMin * scale) / scale;
 	float y = (random(0, abs(yMax - yMin) * scale) + yMin * scale) / scale;
 	float z = (random(0, abs(zMax - zMin) * scale) + zMin * scale) / scale;
+
 	glm::vec3 direction = glm::normalize(glm::vec3(x, y, z));
 	return direction;
 }
@@ -731,6 +732,10 @@ void updateParticleSystem(ParticleSystem &particleSystem, glm::vec3 cameraPositi
 	// Spawn new particles
 	particleSystem.timeSinceLastSpawn += dt;
 	int numParticlesToSpawn = (int)particleSystem.particlesPerSecond * particleSystem.timeSinceLastSpawn;
+	glm::mat4 parentTransformation = glm::mat4();
+	if (particleSystem.parentEntity) {
+		parentTransformation = getEntityTransformation(*particleSystem.parentEntity);
+	}
 	for (int i = 0; i < numParticlesToSpawn && particleSystem.numParticles < particleSystem.maxNumParticles; i++) {
 		Particle p = Particle();
 		float scale = random(particleSystem.minSize * 100, particleSystem.maxSize * 100) / 100.0f;
@@ -738,8 +743,11 @@ void updateParticleSystem(ParticleSystem &particleSystem, glm::vec3 cameraPositi
 		p.lifetime = random(particleSystem.minLifetime * 100, particleSystem.maxLifetime * 100) / 100.0f;
 		p.velocity = generateParticleDirection(particleSystem) * particleSystem.velocity;
 		p.position = glm::normalize(p.velocity) * particleSystem.sphereRadiusSpawn + particleSystem.position;
+		if (!particleSystem.followParent) {
+			//p.position = glm::vec3(parentTransformation[3]);
+			p.position = glm::vec3(parentTransformation * glm::vec4(p.position.x, p.position.y, p.position.z, 1));
+		}
 		p.setParentEntity(particleSystem.parentEntity);
-
 		particleSystem.particles[particleSystem.numParticles] = p;
 		particleSystem.numParticles += 1;
 		particleSystem.timeSinceLastSpawn = 0;
@@ -759,4 +767,14 @@ int random(int min, int max) {
 		return 0;
 	}
 	return (rand() % (max - min)) + min;
+}
+
+int sign(float i) {
+	if (i < 0) {
+		return -1;
+	}
+	if (i == 0) {
+		return 0;
+	}
+	return 1;
 }

@@ -114,8 +114,6 @@ void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, floa
 	glm::vec3 acceleration = netForce / mass;
 	velocity = velocity + acceleration * dt;
 	position = position + velocity * dt;
-
-	//std::cout << "Velocity: " << glm::length(velocity) << " m/s" << std::endl;
 }
 
 void normalPhysics(Entity &entity, float dt) {

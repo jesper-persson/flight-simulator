@@ -114,7 +114,7 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 
 	glm::mat4 rotateBack;
-	if (particle->getParentEntity()) {
+	if (particle->getParentEntity() && particleSystem.followParent) {
 		Entity parentEntity = *particle->getParentEntity();
 		glm::mat4 parentTransformation = getEntityTransformation(parentEntity);
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parentTransformation));
@@ -140,6 +140,7 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	int numIndices = particleSystem.model.numIndices;
 	int i = 0;
 
+	glBindVertexArray(particleSystem.model.vao);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, particleSystem.textureId);
 	glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
@@ -156,9 +157,9 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	QueryPerformanceCounter(&startingTime);
 
 	float transformation[] = {
-		0, 0, 0, 0,
-		0, 0, 0, 0,
-		0, 0, 0, 0,
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
 		0, 0, 0, 1,
 	};
 
@@ -721,8 +722,8 @@ int program() {
 
 	Entity cube = Entity();
 	cube.setModel(getVAOCube());
-	cube.scale = glm::vec3(1, 1, 1);
-	cube.position = glm::vec3(10, 100, 14);
+	cube.scale = glm::vec3(0.1, 0.1, 0.1);
+	cube.position = glm::vec3(0, 0, 0);
 	cube.textureId = loadPNGTexture("Resources/grass512.png");
 	cube.normalMapId = loadPNGTexture("Resources/normalmap.png");
 
@@ -759,9 +760,8 @@ int program() {
 
 	// Particles
 	Model particleModel = getVAOQuad();
-	ParticleSystem smoke = ParticleSystem(40000);
+	ParticleSystem smoke = ParticleSystem(300 * 2);
 	smoke.model = particleModel;
-	smoke.position = glm::vec3(10, 10, 10);
 	smoke.particlesPerSecond = 300;
 	smoke.timeSinceLastSpawn = 0;
 	smoke.minLifetime = 0.9f;
@@ -773,8 +773,27 @@ int program() {
 	smoke.atlasSize = 8;
 	smoke.velocity = 3.25f;
 	smoke.position = glm::vec3(0, 0.25f, -5.9f);
-	smoke.setDirection(-0.08f, 0.08f, -0.8, -1, -0.05f, 0.05f);
+	smoke.setDirection(-0.08, 0.08, -0.08, 0.08, -1.1, -1);
 	smoke.parentEntity = airplane[0];
+	smoke.followParent = true;
+
+	// Wingtip
+	ParticleSystem wingtip = ParticleSystem(2000);
+	wingtip.model = particleModel;
+	wingtip.particlesPerSecond = 206;
+	wingtip.timeSinceLastSpawn = 0;
+	wingtip.minLifetime = 3.9f;
+	wingtip.maxLifetime = 20.0f;
+	wingtip.minSize = .1f;
+	wingtip.maxSize = .2f;
+	wingtip.sphereRadiusSpawn = 0.2f;
+	wingtip.textureId = loadPNGTexture("Resources/particle-atlas3.png");
+	wingtip.atlasSize = 8;
+	wingtip.velocity = 1.0f;
+	wingtip.position = glm::vec3(4.0f, 0.0f, -4.2f);
+	wingtip.setDirection(-0.05f, 0.05f, -0.05f, 0.05f, -100, -90);
+	wingtip.parentEntity = airplane[0];
+	wingtip.followParent = false;
 
 	glClearColor(1, 0.43, 0.66, 0.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -876,6 +895,7 @@ int program() {
 			}
 			cameraForward = glm::normalize(entityToFollow->position - cameraPosition);
 			cam = glm::lookAt(cameraPosition, entityToFollow->position, entityToFollow->up);
+			cameraUp = entityToFollow->up;
 		}
 
 		worldGreenMovingLight.position.x = 100 * sin(glfwGetTime() / (float)10) + 400;
@@ -922,8 +942,12 @@ int program() {
 		// Particles
 		Entity parentEntity = *airplane[0];
 		updateParticleSystem(smoke, cameraPosition, cameraForward, dt);
+		updateParticleSystem(wingtip, cameraPosition, cameraForward, dt);
 		if (smoke.numParticles > 0) {
 			renderParticleSystem(smoke, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderProgress, cam, perspective);
+		}
+		if (wingtip.numParticles > 0) {
+			renderParticleSystem(wingtip, instancedShader, uniformLocationInstanceShaderTransformation, uniformLocationInstanceShaderProgress, cam, perspective);
 		}
 
 		// Draw lights
