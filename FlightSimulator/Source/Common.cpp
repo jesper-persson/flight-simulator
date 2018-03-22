@@ -656,7 +656,7 @@ glm::vec3 generateParticleDirection(ParticleSystem &particleSystem) {
 	return direction;
 }
 
-void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPosition, glm::vec3 cameraForward) {
+void sortParticles(ParticleSystem &particleSystem, Particle *particle, int numParticles, glm::vec3 cameraPosition, glm::vec3 cameraForward) {
 	if (numParticles == 0) {
 		return;
 	}
@@ -668,7 +668,7 @@ void sortParticles(Particle *particle, int numParticles, glm::vec3 cameraPositio
 
 	// Rembember that parentTransformation will be column major
 	const float *parentTransformation = nullptr;
-	if (particle->getParentEntity()) {
+	if (particle->getParentEntity() && particleSystem.followParent) {
 		parentTransformation = glm::value_ptr(getEntityTransformation(*particle->getParentEntity()));
 	}
 
@@ -736,25 +736,31 @@ void updateParticleSystem(ParticleSystem &particleSystem, glm::vec3 cameraPositi
 	if (particleSystem.parentEntity) {
 		parentTransformation = getEntityTransformation(*particleSystem.parentEntity);
 	}
+	glm::vec3 parentPosition = parentTransformation[3];
+	glm::vec3 oldParentPositionDir = (parentPosition - particleSystem.parentEntityLastPosition);
+	glm::vec3 newOldPosition = parentTransformation[3];
+	
 	for (int i = 0; i < numParticlesToSpawn && particleSystem.numParticles < particleSystem.maxNumParticles; i++) {
 		Particle p = Particle();
 		float scale = random(particleSystem.minSize * 100, particleSystem.maxSize * 100) / 100.0f;
 		p.scale = glm::vec3(scale, scale, 1.0f);
 		p.lifetime = random(particleSystem.minLifetime * 100, particleSystem.maxLifetime * 100) / 100.0f;
 		p.velocity = generateParticleDirection(particleSystem) * particleSystem.velocity;
-		p.position = glm::normalize(p.velocity) * particleSystem.sphereRadiusSpawn + particleSystem.position;
+		p.position = /*glm::normalize(p.velocity) * particleSystem.sphereRadiusSpawn */ /** dt * (float)i/(float)numParticlesToSpawn*/  particleSystem.position;
+		p.rotation = random(0, 3.14 * 100) / 100.0f;
 		if (!particleSystem.followParent) {
-			//p.position = glm::vec3(parentTransformation[3]);
-			p.position = glm::vec3(parentTransformation * glm::vec4(p.position.x, p.position.y, p.position.z, 1));
+			parentTransformation[3] = glm::vec4(parentPosition + oldParentPositionDir * (float)(i) / (float)numParticlesToSpawn, 1);
+			p.position = glm::vec3(parentTransformation * glm::vec4(p.position.x, p.position.y, p.position.z, 1));	
 		}
 		p.setParentEntity(particleSystem.parentEntity);
 		particleSystem.particles[particleSystem.numParticles] = p;
 		particleSystem.numParticles += 1;
 		particleSystem.timeSinceLastSpawn = 0;
 	}
+	particleSystem.parentEntityLastPosition = newOldPosition;
 
 	// Sort particles
-	sortParticles(particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection);
+	sortParticles(particleSystem, particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection);
 }
 
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt) {

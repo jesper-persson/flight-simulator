@@ -114,17 +114,19 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(perspective));
 
 	glm::mat4 rotateBack;
-	if (particle->getParentEntity() && particleSystem.followParent) {
+	glm::mat4 identity = glm::mat4();
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(identity));
+	rotateBack = identity;
+
+	if (particle->getParentEntity()) {
 		Entity parentEntity = *particle->getParentEntity();
-		glm::mat4 parentTransformation = getEntityTransformation(parentEntity);
-		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parentTransformation));
+		if (particleSystem.followParent) {
+			glm::mat4 parentTransformation = getEntityTransformation(parentEntity);
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(parentTransformation));
+			glm::quat quaternion2 = directionToQuaternion(parentEntity.forward, parentEntity.up, DEFAULT_FORWARD, DEFAULT_UP);
+			rotateBack = glm::inverse(glm::toMat4(quaternion2));
+		}
 		// Get rotation matrix for rotating back, from the rotation crated from parent transformation
-		glm::quat quaternion2 = directionToQuaternion(parentEntity.forward, parentEntity.up, DEFAULT_FORWARD, DEFAULT_UP);
-		rotateBack = glm::inverse(glm::toMat4(quaternion2));
-	} else {
-		glm::mat4 identity = glm::mat4();
-		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "parentTransformation"), 1, GL_FALSE, glm::value_ptr(identity));
-		rotateBack = identity;
 	}
 
 	// Extract camera rotation from worldToView
@@ -135,7 +137,7 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	cameraRotation[3][3] = 1;
 	
 	glm::mat4 totalRotationGLM = rotateBack * cameraRotation;
-	float *totalRotation = glm::value_ptr(totalRotationGLM);
+	const float *totalRotation = glm::value_ptr(glm::transpose(totalRotationGLM));
 
 	int numIndices = particleSystem.model.numIndices;
 	int i = 0;
@@ -164,16 +166,25 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	};
 
 	for (int j = 0; j < particleSystem.numParticles; i++, j++) {
+		float rotation = particle->rotation;
+
+		// Scale and first xy rotation
+		float index0 = particle->scale.x * cos(rotation);
+		float index1 = particle->scale.y * -sin(rotation);
+		float index4 = particle->scale.x * sin(rotation);
+		float index5 = particle->scale.y * cos(rotation);
+		float index10 = particle->scale.z;
+
 		// Rotation and scale
-		transformation[0] = particle->scale.x * totalRotation[0];
-		transformation[1] = particle->scale.y * totalRotation[4];
-		transformation[2] = particle->scale.z * totalRotation[8];
-		transformation[4] = particle->scale.x * totalRotation[1];
-		transformation[5] = particle->scale.y * totalRotation[5];
-		transformation[6] = particle->scale.z * totalRotation[9];
-		transformation[8] = particle->scale.x * totalRotation[2];
-		transformation[9] = particle->scale.y * totalRotation[6];
-		transformation[10] = particle->scale.z * totalRotation[10];
+		transformation[0] = totalRotation[0] * index0 + totalRotation[1] * index4;
+		transformation[1] = totalRotation[0] * index1 + totalRotation[1] * index5;
+		transformation[2] = totalRotation[2] * index10;
+		transformation[4] = totalRotation[4] * index0 + totalRotation[5] * index4;
+		transformation[5] = totalRotation[4] * index1 + totalRotation[5] * index5;
+		transformation[6] = totalRotation[6] * index10;
+		transformation[8] = totalRotation[8] * index0 + totalRotation[9] * index4;
+		transformation[9] = totalRotation[8] * index1 + totalRotation[9] * index5;
+		transformation[10] = totalRotation[10] * index10;
 
 		// Transform
 		transformation[3] = particle->position.x;
@@ -778,20 +789,20 @@ int program() {
 	smoke.followParent = true;
 
 	// Wingtip
-	ParticleSystem wingtip = ParticleSystem(2000);
+	ParticleSystem wingtip = ParticleSystem(20000);
 	wingtip.model = particleModel;
-	wingtip.particlesPerSecond = 206;
+	wingtip.particlesPerSecond = 2000;
 	wingtip.timeSinceLastSpawn = 0;
-	wingtip.minLifetime = 3.9f;
-	wingtip.maxLifetime = 20.0f;
-	wingtip.minSize = .1f;
-	wingtip.maxSize = .2f;
+	wingtip.minLifetime = 0.1f;
+	wingtip.maxLifetime = 0.4f;
+	wingtip.minSize = .02f;
+	wingtip.maxSize = .04f;
 	wingtip.sphereRadiusSpawn = 0.2f;
 	wingtip.textureId = loadPNGTexture("Resources/particle-atlas3.png");
 	wingtip.atlasSize = 8;
-	wingtip.velocity = 1.0f;
+	wingtip.velocity = 0.00001f;
 	wingtip.position = glm::vec3(4.0f, 0.0f, -4.2f);
-	wingtip.setDirection(-0.05f, 0.05f, -0.05f, 0.05f, -100, -90);
+	wingtip.setDirection(-0.05f, 0.05f, -0.05f, 0.05f, -400, -300);
 	wingtip.parentEntity = airplane[0];
 	wingtip.followParent = false;
 
@@ -830,7 +841,7 @@ int program() {
 
 		bool collision = getHeightAt(heightmapData, size, tileSizeXZ, airplane[0]->position.x, airplane[0]->position.z) >= airplane[0]->position.y - 0.2f;
 
-		if (!boom && collision && glm::length(airplane[0]->velocity) > 20) {
+		if (!boom && collision && glm::length(airplane[0]->velocity) > 120) {
 			std::cout << "BOOOOM!" << std::endl;
 			glm::vec3 velocity = airplane[0]->velocity;
 			for (std::vector<Entity*>::iterator iter = ++airplane.begin(); iter != airplane.end(); iter++) {

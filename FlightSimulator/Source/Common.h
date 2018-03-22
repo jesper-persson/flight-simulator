@@ -152,6 +152,7 @@ public:
 	Entity *parentEntity;
 	glm::vec3 scale;
 	glm::vec3 position;
+	float rotation = 0;
 	glm::vec3 velocity;
 	// Denotes the duration in seconds this particle has lived
 	float timeAlive = 0;
@@ -193,6 +194,8 @@ public:
 	Particle *particles;
 	float minX, maxX, minZ, maxZ, minY, maxY;
 	Entity *parentEntity;
+	// Used for spawning particles in between frames
+	glm::vec3 parentEntityLastPosition = glm::vec3(0, 0, 0);
 	bool followParent = false;
 };
 
