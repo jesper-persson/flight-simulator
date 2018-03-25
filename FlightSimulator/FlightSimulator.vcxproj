@@ -130,12 +130,14 @@
     <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\EntityFactory.cpp" />
     <ClCompile Include="Source\Main.cpp" />
+    <ClCompile Include="Source\ParticleSystem.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\DiamondSquare.h" />
     <ClInclude Include="Source\EntityFactory.h" />
+    <ClInclude Include="Source\ParticleSystem.h" />
     <ClInclude Include="Source\Physics.h" />
   </ItemGroup>
   <ItemGroup>

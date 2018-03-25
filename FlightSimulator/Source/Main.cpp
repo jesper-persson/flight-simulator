@@ -17,6 +17,7 @@
 #include <glm/gtx/rotate_vector.hpp> 
 #include <glm/gtx/quaternion.hpp>
 
+#include "ParticleSystem.h"
 #include <lodepng.h>
 #include "Common.h"
 #include "DiamondSquare.h"
@@ -794,13 +795,13 @@ int program() {
 	wingtip.particlesPerSecond = 2000;
 	wingtip.timeSinceLastSpawn = 0;
 	wingtip.minLifetime = 0.1f;
-	wingtip.maxLifetime = 0.4f;
+	wingtip.maxLifetime = 2.4f;
 	wingtip.minSize = .02f;
 	wingtip.maxSize = .04f;
 	wingtip.sphereRadiusSpawn = 0.2f;
 	wingtip.textureId = loadPNGTexture("Resources/particle-atlas3.png");
 	wingtip.atlasSize = 8;
-	wingtip.velocity = 0.00001f;
+	wingtip.velocity = 0.0000001f;
 	wingtip.position = glm::vec3(4.0f, 0.0f, -4.2f);
 	wingtip.setDirection(-0.05f, 0.05f, -0.05f, 0.05f, -400, -300);
 	wingtip.parentEntity = airplane[0];
@@ -896,7 +897,7 @@ int program() {
 		// Camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 14.0f, cameraUp);
 		if (entityToFollow) {
-			glm::vec3 targetPosition = entityToFollow->position + -entityToFollow->forward * 2.5f * (boom ? 2.0f : 1.0f) + entityToFollow->up * 1.0f  * (boom ? 2.0f : 1.0f);
+			glm::vec3 targetPosition = entityToFollow->position + -entityToFollow->forward * 22.5f * (boom ? 2.0f : 1.0f) + entityToFollow->up * 1.0f  * (boom ? 2.0f : 1.0f);
 			//cameraPosition = targetPosition;
 
 			interpolateCamera(targetPosition, cameraPosition, dt);
