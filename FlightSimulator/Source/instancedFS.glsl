@@ -19,11 +19,12 @@ void main() {
 	float progressNeededForNextSprite = float(i + 1) / float(atlasSize * atlasSize);
 
 	float interp = (progressNeededForNextSprite - progressVS) / float(progressPerImage);
-	if (interp>=1) {
-	interp = 1;
+	if (interp >= 1) {
+		interp = 1;
 	}
-	if (interp<=0) {
-	interp =0;}
+	if (interp <= 0) {
+		interp =0;
+	}
 
 	vec4 sprite1 = getSprite(i);
 	vec4 sprite2 = getSprite(i + 1);
@@ -32,5 +33,4 @@ void main() {
 	}
 	vec4 color = mix(sprite2, sprite1, interp);
 	gl_Color = color;
-	//gl_Color.w = 1;
 }

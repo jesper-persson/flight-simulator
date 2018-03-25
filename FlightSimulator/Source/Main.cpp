@@ -152,7 +152,7 @@ void renderParticleSystem(ParticleSystem &particleSystem, GLuint shaderProgram, 
 	//glDisable(GL_DEPTH_TEST);
 
 	std::string uniformNameProgress = std::string("atlasSize");
-	glUniform1i(glGetUniformLocation(shaderProgram, uniformNameProgress.c_str()), 8);
+	glUniform1i(glGetUniformLocation(shaderProgram, uniformNameProgress.c_str()), particleSystem.atlasSize);
 
 	LARGE_INTEGER startingTime, endingTime, elapsedMicroseconds;
 	LARGE_INTEGER frequency;
@@ -792,18 +792,18 @@ int program() {
 	// Wingtip
 	ParticleSystem wingtip = ParticleSystem(20000);
 	wingtip.model = particleModel;
-	wingtip.particlesPerSecond = 2000;
+	wingtip.particlesPerSecond = 2500;
 	wingtip.timeSinceLastSpawn = 0;
 	wingtip.minLifetime = 0.1f;
 	wingtip.maxLifetime = 2.4f;
-	wingtip.minSize = .02f;
-	wingtip.maxSize = .04f;
+	wingtip.minSize = .03f;
+	wingtip.maxSize = .1f;
 	wingtip.sphereRadiusSpawn = 0.2f;
 	wingtip.textureId = loadPNGTexture("Resources/particle-atlas3.png");
 	wingtip.atlasSize = 8;
 	wingtip.velocity = 0.0000001f;
 	wingtip.position = glm::vec3(4.0f, 0.0f, -4.2f);
-	wingtip.setDirection(-0.05f, 0.05f, -0.05f, 0.05f, -400, -300);
+	wingtip.setDirection(-0.1f, 0.1f, -0.1f, 0.1f, -200, -100);
 	wingtip.parentEntity = airplane[0];
 	wingtip.followParent = false;
 
@@ -897,7 +897,7 @@ int program() {
 		// Camera
 		glm::mat4 cam = glm::lookAt(cameraPosition, cameraPosition + cameraForward * 14.0f, cameraUp);
 		if (entityToFollow) {
-			glm::vec3 targetPosition = entityToFollow->position + -entityToFollow->forward * 22.5f * (boom ? 2.0f : 1.0f) + entityToFollow->up * 1.0f  * (boom ? 2.0f : 1.0f);
+			glm::vec3 targetPosition = entityToFollow->position + -entityToFollow->forward * 2.5f * (boom ? 2.0f : 1.0f) + entityToFollow->up * 1.0f  * (boom ? 2.0f : 1.0f);
 			//cameraPosition = targetPosition;
 
 			interpolateCamera(targetPosition, cameraPosition, dt);
