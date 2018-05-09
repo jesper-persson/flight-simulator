@@ -49,7 +49,7 @@ void main() {
 	if (useLights) {
 		totalLight = vec4(0, 0, 0, 0);	
 		for (int i = 0; i < 10; i++) {
-			totalLight = totalLight + calculateLight(lights[i], vec3(0.5, 0.5, 0.5), vec3(0, 0, 0), fragmentVS, normalVS, viewPositionVS);
+			totalLight = totalLight + calculateLight(lights[i], vec3(0.5, 0.5, 0.5), vec3(0.8, 0.8, 0.8), fragmentVS, normalVS, viewPositionVS);
 		}
 	}
 

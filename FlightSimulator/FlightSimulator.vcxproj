@@ -132,6 +132,7 @@
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\ParticleSystem.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
+    <ClCompile Include="Source\Rendering.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h" />
@@ -139,6 +140,7 @@
     <ClInclude Include="Source\EntityFactory.h" />
     <ClInclude Include="Source\ParticleSystem.h" />
     <ClInclude Include="Source\Physics.h" />
+    <ClInclude Include="Source\Rendering.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\common.glsl" />

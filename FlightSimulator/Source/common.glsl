@@ -23,6 +23,8 @@ bool isSpot(Light light) {
 	return light.type == 2;
 }
 
+// diffuse = diffuse component of material
+// specilar = specular component of material
 vec4 calculateLight(Light light, vec3 diffuse, vec3 specular, vec3 fragment, vec3 normal, vec3 viewPosition) {
 	if (light.type == -1) {
 		return vec4(0, 0, 0, 0);
@@ -55,7 +57,7 @@ vec4 calculateLight(Light light, vec3 diffuse, vec3 specular, vec3 fragment, vec
 	
 	vec3 reflectionDirection = reflect(lightToFragment, normalize(normal));
 	float cosAngle = max(0.0, dot(fragmentToView, reflectionDirection));
-	float specularExponent = 1f;
+	float specularExponent = 280f;
 	float specularIntensity = pow(cosAngle, specularExponent) * attenuation * light.intensity;
 
 	vec3 result = diffuseIntensity * light.color * diffuse + specularIntensity * light.color * specular;

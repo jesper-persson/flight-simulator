@@ -79,7 +79,7 @@ void sortParticles(ParticleSystem &particleSystem, Particle *particle, int numPa
 	elapsedMicroseconds.QuadPart = endingTime.QuadPart - startingTime.QuadPart;
 	elapsedMicroseconds.QuadPart *= 1000000;
 	elapsedMicroseconds.QuadPart /= frequency.QuadPart;
-	//std::cout << elapsedMicroseconds.QuadPart << std::endl;
+	std::cout << elapsedMicroseconds.QuadPart << std::endl;
 }
 
 void updateParticle(ParticleSystem &particleSystem, Particle &particle, float dt) {
@@ -131,5 +131,6 @@ void updateParticleSystem(ParticleSystem &particleSystem, glm::vec3 cameraPositi
 	particleSystem.parentEntityLastPosition = newOldPosition;
 
 	// Sort particles
+
 	sortParticles(particleSystem, particleSystem.particles, particleSystem.numParticles, cameraPosition, cameraDirection);
 }

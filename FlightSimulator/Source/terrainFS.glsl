@@ -21,30 +21,9 @@ void main() {
 	vec4 terrain1 = texture(tex, textureVS);
 	vec4 terrain2 = texture(tex2, textureVS);
 	vec4 terrain3 = texture(tex3, textureVS);
-	vec4 splat = texture(tex4, textureVS / 400);
+	vec4 splat = texture(tex4, textureVS / 500);
 	vec4 terrainColor = (splat.x * terrain1 + splat.y * terrain2 + splat.z * terrain3);
 
-	// Light directionalLight;
-	// directionalLight.type = 0;
-	// directionalLight.direction = normalize(vec3(0, -1, 0));
-	// directionalLight.intensity = 1;
-	// directionalLight.color = vec3(1, 1, 1);
-
-	// Light pointLight;
-	// pointLight.type = 1;
-	// pointLight.position = vec3(40, 4, 40);
-	// pointLight.attenuationC1 = 0.001;
-	// pointLight.attenuationC2 = 0;
-	// pointLight.color = vec3(1, 0, 0);
-
-	// Light spotlight;
-	// spotlight.cutoffAngle = 0.9;
-	// spotlight.type = 2;
-	// spotlight.position = vec3(20, 5, 10);
-	// spotlight.direction = normalize(vec3(0, -4, 1));
-	// spotlight.attenuationC1 = 0.001;
-	// spotlight.attenuationC2 = 0;
-	// spotlight.color = vec3(1, 1, 1);
 
 	// Combine lights
 	vec4 totalLight = vec4(0, 0, 0, 0);

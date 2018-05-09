@@ -27,6 +27,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+// Converts directional vector (forward and up) to a quaternion
 glm::quat directionToQuaternion(glm::vec3 forward, glm::vec3 up, glm::vec3 defaultForward, glm::vec3 defaultUp) {
 	assert(std::abs(glm::dot(forward, up)) <= 0.00001f, "Forward and up must be perpendicular");
 
@@ -85,6 +86,7 @@ std::string readFile(std::string path) {
 	return str;
 }
 
+// Converts heightmap to a mesh
 Model heightmapToModel(float *heightmap, int width, int height, float scaleX, float scaleY, float scaleZ, float textureScale) {
 	std::unique_ptr<float> positions(new float[width * height * 3]);
 	std::unique_ptr<float> normals(new float[width * height * 3]);
@@ -655,4 +657,16 @@ int sign(float i) {
 		return 0;
 	}
 	return 1;
+}
+
+std::vector<unsigned char> loadPNG(std::string filename) {
+	const char* filenameC = (const char*)filename.c_str();
+	std::vector<unsigned char> image;
+	unsigned width, height;
+	unsigned error = lodepng::decode(image, width, height, filename);
+	std::vector<unsigned char> imageCopy(width * height * 4);
+	for (unsigned i = 0; i < height; i++) {
+		memcpy(&imageCopy[(height - i - 1) * width * 4], &image[i * width * 4], width * 4);
+	}
+	return image;
 }

@@ -11,7 +11,7 @@
 #define COMMON_H
 
 // Use this to generate smaller worlds, lower textures and such to reduce launch time
-const bool FAST_MODE = true;
+const bool FAST_MODE = false;
 
 const glm::vec3 DEFAULT_FORWARD = glm::vec3(0, 0, 1);
 const glm::vec3 DEFAULT_UP = glm::vec3(0, 1, 0);
@@ -154,5 +154,7 @@ GLuint loadPNGTexture(std::string filename);
 int random(int min, int max);
 
 int sign(float i);
+
+std::vector<unsigned char> loadPNG(std::string filename);
 
 #endif

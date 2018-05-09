@@ -4,6 +4,9 @@
 
 #include "Common.h"
 
+// Make sure to update shader if this value changes
+const int NUM_PARTICLES_PER_DRAW_CALL = 100;
+
 class Particle {
 public:
 	Particle(glm::vec3 position, glm::vec3 scale, glm::vec3 velocity, float lifetime) {

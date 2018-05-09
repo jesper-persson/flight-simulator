@@ -58,8 +58,11 @@ void steerAirplane(Entity &main, Entity &aileronLeft, Entity &aileronRight, Enti
 		}
 	}
 
-	float maxThrustForce = 40000; // Newtons
-	float maxBreakForce = 2000; // Newtons
+	float maxThrustForce = 40000 * log(1 + glm::length(main.velocity) / 60) + 1000; // Newtons
+
+	//std::cout << maxThrustForce << std::endl;
+
+	float maxBreakForce = glm::length(main.velocity) * 1000 + 1000; // Newtons
 	glm::vec3 thrustForce = main.forward * (float)thrust * (thrust == 1 ? maxThrustForce : maxBreakForce);
 	main.impulse = thrustForce;
 }
@@ -68,8 +71,8 @@ void steerAirplane(Entity &main, Entity &aileronLeft, Entity &aileronRight, Enti
 // assumes 1 distance unit in the game is 1 meter
 void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, float dt) {
 	float mass = 1000;
-	float gravitationalAcceleration = 9.82f;
-	float airResistanceConstant = 20; // Includes density and area
+	float gravitationalAcceleration = 4.82f;
+	float airResistanceConstant = 10; // Includes density and area
 	float liftConstant = 160;
 
 	glm::vec3 &up = entity.up;
@@ -82,8 +85,8 @@ void airplanePhysics(Entity &entity, Entity &aileronLeft, Entity &leftFlap, floa
 	
 	glm::vec3 airResitance = glm::vec3(0, 0, 0);
 	if (glm::length(velocity) > 0) {
-		float areaTopBottom = 1 + 10.3f * std::abs(glm::dot(up, glm::normalize(velocity)));
-		float areaLeftRight = 1 + 1.2f * std::abs(glm::dot(glm::normalize(glm::cross(up, forward)), glm::normalize(velocity)));
+		float areaTopBottom = 1 + 1.3f * std::abs(glm::dot(up, glm::normalize(velocity)));
+		float areaLeftRight = 1 + .01f * std::abs(glm::dot(glm::normalize(glm::cross(up, forward)), glm::normalize(velocity)));
 
 		airResitance = -glm::normalize(velocity) * glm::length(velocity) * glm::length(velocity) * airResistanceConstant * areaTopBottom * areaLeftRight;
 	}
@@ -124,5 +127,13 @@ void normalPhysics(Entity &entity, float dt) {
 	glm::vec3 netForce = gravity + airResistance;
 	glm::vec3 acceleration = netForce / mass;
 	entity.velocity = entity.velocity + acceleration * dt;
+	entity.position = entity.position + entity.velocity * dt;
+}
+
+void runPhysics(Entity &entity, float dt) {
+	glm::vec3 gravity = glm::vec3(0, -0.4f, 0);
+	glm::vec3 netForce = entity.impulse + gravity;
+	entity.impulse = glm::vec3(0, 0, 0);
+	entity.velocity = entity.velocity + netForce;
 	entity.position = entity.position + entity.velocity * dt;
 }
