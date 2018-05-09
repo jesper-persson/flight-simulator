@@ -1,18 +1,13 @@
 # Flight Simulator
-This is a flight simulator written in C++ with OpenGL. I created this projected to learn more about graphic programming.
+This is a flight simulator written in C++ with OpenGL.
 
 ## Techniques used in this project
 - Terrain generation with diamond-square algorithm
 - Splat maps
-- Diffuse lighting
-- Normal mapping
-
-## To add
-- Shadows using depth buffer
-- Displacement maps
-- Post processing shader
+- Diffuse lighting / specular lighting
+- Normal mapping (although not in use in current game scene)
 - Particle system
-- Sky box (using cube map)
+- Skybox
 
 ## Disclaimer
 - None of the 3d models were modelled by me
